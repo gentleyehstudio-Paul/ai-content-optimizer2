@@ -700,6 +700,10 @@ void main() {
         const canvas = canvasRef.current;
         if (!canvas) return;
         try {
+          // Set default canvas size
+          canvas.width = 1280;
+          canvas.height = 720;
+
           const gl = canvas.getContext('webgl2', {
             antialias: false,
             alpha: false,
@@ -707,11 +711,14 @@ void main() {
           });
           if (!gl) throw new Error('WebGL 2.0 not supported');
           glRef.current = gl;
+          gl.viewport(0, 0, canvas.width, canvas.height);
           gl.clearColor(0, 0, 0, 1);
           gl.clear(gl.COLOR_BUFFER_BIT);
+
           const shader = shaders[mode];
           const program = createShaderProgram(gl, shader.vertexSource, shader.fragmentSource);
           programRef.current = program;
+
           const texture = gl.createTexture();
           textureRef.current = texture;
           gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -719,6 +726,10 @@ void main() {
           gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
           gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
           gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+          // Create a black placeholder texture
+          const blackPixel = new Uint8Array([0, 0, 0]);
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, 1, 1, 0, gl.RGB, gl.UNSIGNED_BYTE, blackPixel);
         } catch (err) {
           onError(`WebGL initialization failed: ${err.message}`);
         }
@@ -771,11 +782,13 @@ void main() {
         const gl = glRef.current;
         const program = programRef.current;
         const texture = textureRef.current;
-        if (!canvas || !video || !gl || !program || !texture) {
+        if (!canvas || !gl || !program || !texture) {
           animationIdRef.current = requestAnimationFrame(renderLoop);
           return;
         }
-        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+
+        // Update canvas size if video is ready
+        if (video && video.readyState === video.HAVE_ENOUGH_DATA) {
           if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
@@ -783,8 +796,11 @@ void main() {
           }
           gl.bindTexture(gl.TEXTURE_2D, texture);
           gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, video);
-          renderFrame(gl, program, texture, parameters);
         }
+
+        // Always render (with video or placeholder)
+        renderFrame(gl, program, texture, parameters);
+
         frameCountRef.current++;
         const now = Date.now();
         const elapsed = now - lastTimeRef.current;
@@ -800,18 +816,13 @@ void main() {
       useEffect(() => {
         if (!isActive) {
           if (animationIdRef.current) cancelAnimationFrame(animationIdRef.current);
+          animationIdRef.current = null;
           return;
         }
-        const video = videoRef.current;
-        if (!video) return;
-        const handleCanPlay = () => {
-          if (!animationIdRef.current) animationIdRef.current = requestAnimationFrame(renderLoop);
-        };
-        video.addEventListener('canplay', handleCanPlay);
-        return () => {
-          video.removeEventListener('canplay', handleCanPlay);
-          if (animationIdRef.current) cancelAnimationFrame(animationIdRef.current);
-        };
+        // Start render loop immediately
+        if (!animationIdRef.current) {
+          animationIdRef.current = requestAnimationFrame(renderLoop);
+        }
       }, [isActive, renderLoop]);
 
       return (
