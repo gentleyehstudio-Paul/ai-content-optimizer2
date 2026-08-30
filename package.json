@@ -1,0 +1,43 @@
+{
+  "name": "animal-vision-webgl-simulator",
+  "version": "1.0.0",
+  "description": "Real-time WebGL 2.0 animal vision simulator with GPU-accelerated filtering",
+  "type": "module",
+  "main": "src/index.jsx",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint src --ext .jsx,.js"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@vitejs/plugin-react": "^4.2.0",
+    "vite": "^5.0.0"
+  },
+  "browserslist": [
+    "Chrome > 56",
+    "Firefox > 51",
+    "Safari > 15",
+    "Edge > 79",
+    "iOS Safari > 15"
+  ],
+  "keywords": [
+    "webgl",
+    "animal-vision",
+    "gpu-acceleration",
+    "realtime-filtering",
+    "webcam",
+    "shader",
+    "react"
+  ],
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
