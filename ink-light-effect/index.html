@@ -1,0 +1,985 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>水墨光紋引擎 — Ink Light Flow</title>
+<style>
+  :root {
+    --panel-bg: rgba(10, 10, 12, 0.55);
+    --panel-border: rgba(255, 255, 255, 0.12);
+    --text: #e8e8ec;
+    --accent: #cfd6ff;
+    --success: #7dd3fc;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: #000;
+    color: var(--text);
+    font-family: -apple-system, "PingFang TC", "Noto Sans TC", "Helvetica Neue", Arial, sans-serif;
+    overflow: hidden;
+  }
+  #stage-wrap {
+    position: fixed;
+    inset: 0;
+  }
+  canvas#stage {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  video#cam, video#video-source {
+    display: none;
+  }
+  #hint, #panel, #status {
+    position: fixed;
+    z-index: 10;
+  }
+  #hint {
+    top: 24px;
+    left: 24px;
+    letter-spacing: 0.08em;
+    font-size: 12px;
+    opacity: 0.6;
+    text-transform: uppercase;
+  }
+  #hint b { color: var(--accent); font-weight: 600; }
+  #status {
+    top: 24px;
+    right: 24px;
+    font-size: 12px;
+    opacity: 0.55;
+    text-align: right;
+  }
+  #panel {
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 12px 20px;
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 14px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    font-size: 12px;
+    flex-wrap: wrap;
+    max-width: 92vw;
+  }
+  .ctrl { display: flex; flex-direction: column; gap: 4px; min-width: 96px; }
+  .ctrl label { opacity: 0.7; letter-spacing: 0.04em; }
+  .ctrl input[type="range"] { width: 100%; accent-color: var(--accent); }
+  button {
+    background: rgba(255,255,255,0.08);
+    color: var(--text);
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 12px;
+    cursor: pointer;
+    letter-spacing: 0.04em;
+    transition: background 0.15s ease;
+  }
+  button:hover { background: rgba(255,255,255,0.16); }
+  button:disabled { opacity: 0.35; cursor: default; }
+  button.recording {
+    background: rgba(255, 70, 70, 0.28);
+    border-color: rgba(255, 100, 100, 0.5);
+  }
+  button.hidden { display: none; }
+  button.processing {
+    background: rgba(100, 150, 255, 0.28);
+    border-color: rgba(140, 180, 255, 0.5);
+  }
+  #save-video-btn {
+    background: rgba(120, 200, 140, 0.22);
+    border-color: rgba(140, 220, 160, 0.45);
+  }
+  #rec-indicator {
+    position: fixed;
+    top: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    color: #ff5c5c;
+    animation: rec-pulse 1.2s ease-in-out infinite;
+  }
+  #rec-indicator.hidden { display: none; }
+  @keyframes rec-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+  }
+  #progress-container {
+    position: fixed;
+    top: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 20px;
+    background: rgba(10, 10, 12, 0.9);
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    min-width: 200px;
+  }
+  #progress-container.visible { display: flex; }
+  #progress-bar {
+    width: 100%;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  #progress-fill {
+    height: 100%;
+    background: var(--success);
+    width: 0%;
+    transition: width 0.1s ease;
+  }
+  #progress-text {
+    font-size: 11px;
+    opacity: 0.8;
+    text-align: center;
+  }
+  select {
+    background: rgba(255,255,255,0.08);
+    color: var(--text);
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 16px;
+    background: #000;
+    z-index: 20;
+    text-align: center;
+    padding: 24px;
+  }
+  #overlay h1 {
+    font-size: 22px;
+    font-weight: 300;
+    letter-spacing: 0.15em;
+    margin: 0;
+  }
+  #overlay p {
+    font-size: 13px;
+    opacity: 0.6;
+    max-width: 420px;
+    line-height: 1.7;
+    margin: 0;
+  }
+  #overlay.hidden { display: none; }
+  #mode-tabs {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  #mode-tabs button {
+    padding: 8px 16px;
+    border-radius: 6px;
+  }
+  #mode-tabs button.active {
+    background: rgba(207, 214, 255, 0.2);
+    border-color: var(--accent);
+  }
+  input[type="file"] {
+    display: none;
+  }
+  .file-input-label {
+    background: rgba(255,255,255,0.08);
+    color: var(--text);
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 12px;
+    cursor: pointer;
+    letter-spacing: 0.04em;
+    transition: background 0.15s ease;
+  }
+  .file-input-label:hover { background: rgba(255,255,255,0.16); }
+</style>
+</head>
+<body>
+
+<div id="overlay">
+  <h1>水墨光紋 · INK LIGHT FLOW</h1>
+  <p>本程式使用開放式演算模型（非固定黑箱），即時分析鏡頭畫面或視頻的明暗梯度與動態變化，
+  將其轉譯為流動的水墨光紋筆觸。需要攝影機權限，且須在 HTTPS 或 localhost 環境下執行。</p>
+
+  <div id="mode-tabs">
+    <button id="camera-mode-btn" class="active">📷 即時鏡頭 Camera</button>
+    <button id="video-mode-btn">🎬 視頻處理 Video</button>
+  </div>
+
+  <div id="camera-mode">
+    <button id="start-btn">啟動鏡頭 · Start Camera</button>
+  </div>
+
+  <div id="video-mode" style="display:none;">
+    <label class="file-input-label">
+      📁 選擇視頻 Select Video
+      <input id="video-file-input" type="file" accept="video/*" />
+    </label>
+    <p id="video-info" style="margin:0; opacity:0.5; font-size:11px;"></p>
+  </div>
+
+  <p id="err" style="color:#ff8a8a; display:none;"></p>
+</div>
+
+<div id="stage-wrap">
+  <video id="cam" playsinline autoplay muted></video>
+  <video id="video-source" playsinline muted></video>
+  <canvas id="stage"></canvas>
+</div>
+
+<div id="hint"><b>INK LIGHT FLOW</b> · realtime camera-driven ink model</div>
+<div id="status">--</div>
+<div id="progress-container">
+  <div id="progress-bar"><div id="progress-fill"></div></div>
+  <div id="progress-text">準備中...</div>
+</div>
+
+<div id="panel">
+  <div class="ctrl">
+    <label>主題 Theme</label>
+    <select id="theme">
+      <option value="dark">墨夜光紋（黑底白光）</option>
+      <option value="paper">宣紙水墨（白底墨色）</option>
+      <option value="aurora">極光水墨（黑底彩光）</option>
+    </select>
+  </div>
+  <div class="ctrl">
+    <label>敏感度 Sensitivity</label>
+    <input id="sensitivity" type="range" min="2" max="40" value="14" />
+  </div>
+  <div class="ctrl">
+    <label>墨韻延遲 Trail</label>
+    <input id="trail" type="range" min="2" max="30" value="9" />
+  </div>
+  <div class="ctrl">
+    <label>筆觸長度 Stroke</label>
+    <input id="stroke" type="range" min="4" max="60" value="26" />
+  </div>
+  <div class="ctrl">
+    <label>粒子密度 Density</label>
+    <input id="density" type="range" min="1" max="10" value="5" />
+  </div>
+  <button id="fullscreen-btn">全螢幕 Fullscreen</button>
+  <button id="camera-flip-btn">🔄 切換鏡頭 Flip Camera</button>
+  <button id="snap-btn">擷取畫面 Save PNG</button>
+  <button id="record-btn">● 開始錄影 Record</button>
+  <button id="process-video-btn" style="display:none;">⚙️ 開始處理 Process</button>
+  <button id="save-video-btn" class="hidden">💾 儲存 / 分享影片 Save Video</button>
+  <button id="pause-btn">暫停 Pause</button>
+  <button id="cancel-btn" class="hidden">✕ 取消 Cancel</button>
+</div>
+<div id="rec-indicator" class="hidden">● REC <span id="rec-time">0:00</span></div>
+
+<script>
+(function () {
+  "use strict";
+
+  const video = document.getElementById("cam");
+  const videoSource = document.getElementById("video-source");
+  const canvas = document.getElementById("stage");
+  const ctx = canvas.getContext("2d", { alpha: false });
+  const overlay = document.getElementById("overlay");
+  const startBtn = document.getElementById("start-btn");
+  const errEl = document.getElementById("err");
+  const statusEl = document.getElementById("status");
+  const snapBtn = document.getElementById("snap-btn");
+  const pauseBtn = document.getElementById("pause-btn");
+  const recordBtn = document.getElementById("record-btn");
+  const processVideoBtn = document.getElementById("process-video-btn");
+  const cancelBtn = document.getElementById("cancel-btn");
+  const recIndicator = document.getElementById("rec-indicator");
+  const recTimeEl = document.getElementById("rec-time");
+  const fullscreenBtn = document.getElementById("fullscreen-btn");
+  const saveVideoBtn = document.getElementById("save-video-btn");
+  const cameraFlipBtn = document.getElementById("camera-flip-btn");
+  const cameraModeBtn = document.getElementById("camera-mode-btn");
+  const videoModeBtn = document.getElementById("video-mode-btn");
+  const videoFileInput = document.getElementById("video-file-input");
+  const videoInfo = document.getElementById("video-info");
+  const progressContainer = document.getElementById("progress-container");
+  const progressFill = document.getElementById("progress-fill");
+  const progressText = document.getElementById("progress-text");
+
+  let currentMode = "camera"; // camera or video
+  let currentCameraFacing = "user";
+  let isProcessing = false;
+  let processingCancelled = false;
+
+  const ui = {
+    theme: document.getElementById("theme"),
+    sensitivity: document.getElementById("sensitivity"),
+    trail: document.getElementById("trail"),
+    stroke: document.getElementById("stroke"),
+    density: document.getElementById("density"),
+  };
+
+  const SAMPLE_W = 96;
+  const SAMPLE_H = 54;
+  const sampleCanvas = document.createElement("canvas");
+  sampleCanvas.width = SAMPLE_W;
+  sampleCanvas.height = SAMPLE_H;
+  const sampleCtx = sampleCanvas.getContext("2d", { willReadFrequently: true });
+
+  let prevLuma = new Float32Array(SAMPLE_W * SAMPLE_H);
+  let currLuma = new Float32Array(SAMPLE_W * SAMPLE_H);
+  let hasPrev = false;
+
+  let running = false;
+  let paused = false;
+  let dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+  const THEMES = {
+    dark: {
+      bg: [0, 0, 0],
+      strokeColors: ["rgba(235,240,255,ALPHA)", "rgba(200,215,255,ALPHA)", "rgba(255,255,255,ALPHA)"],
+      blend: "lighter",
+    },
+    paper: {
+      bg: [246, 242, 233],
+      strokeColors: ["rgba(20,20,24,ALPHA)", "rgba(40,38,44,ALPHA)", "rgba(10,10,12,ALPHA)"],
+      blend: "multiply",
+    },
+    aurora: {
+      bg: [4, 3, 10],
+      strokeColors: ["rgba(120,255,220,ALPHA)", "rgba(180,140,255,ALPHA)", "rgba(255,160,220,ALPHA)"],
+      blend: "lighter",
+    },
+  };
+
+  class Stroke {
+    constructor(x, y, angle, speed, len, hueColor) {
+      this.x = x; this.y = y;
+      this.vx = Math.cos(angle) * speed;
+      this.vy = Math.sin(angle) * speed;
+      this.len = len;
+      this.life = 1;
+      this.decay = 0.035 + Math.random() * 0.04;
+      this.width = 0.8 + Math.random() * 1.6;
+      this.color = hueColor;
+    }
+    step() {
+      this.x += this.vx;
+      this.y += this.vy;
+      this.vx *= 0.94;
+      this.vy *= 0.94;
+      this.life -= this.decay;
+      return this.life > 0;
+    }
+    draw(c, glowScale) {
+      const a = Math.max(this.life, 0);
+      const tailX = this.x - this.vx * this.len;
+      const tailY = this.y - this.vy * this.len;
+      c.strokeStyle = this.color.replace("ALPHA", (a * 0.9).toFixed(3));
+      c.lineWidth = this.width * (0.4 + a * 0.6);
+      c.beginPath();
+      c.moveTo(tailX * glowScale, tailY * glowScale);
+      c.lineTo(this.x * glowScale, this.y * glowScale);
+      c.stroke();
+    }
+  }
+
+  let strokes = [];
+  const MAX_STROKES = 1400;
+
+  const GLOW_SCALE = 0.28;
+  const glowCanvas = document.createElement("canvas");
+  const glowCtx = glowCanvas.getContext("2d");
+
+  function resize() {
+    canvas.width = Math.floor(window.innerWidth * dpr);
+    canvas.height = Math.floor(window.innerHeight * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const theme = THEMES[ui.theme.value];
+    ctx.fillStyle = `rgb(${theme.bg.join(",")})`;
+    ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+
+    glowCanvas.width = Math.max(1, Math.floor(window.innerWidth * GLOW_SCALE));
+    glowCanvas.height = Math.max(1, Math.floor(window.innerHeight * GLOW_SCALE));
+  }
+  window.addEventListener("resize", resize);
+
+  async function startCamera(preferredFacing = "user") {
+    errEl.style.display = "none";
+
+    if (running && video.srcObject) {
+      video.srcObject.getTracks().forEach(track => track.stop());
+      running = false;
+    }
+
+    const facings = preferredFacing === "user" ? ["user", "environment"] : ["environment", "user"];
+
+    for (const facing of facings) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: facing }, width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false,
+        });
+        video.srcObject = stream;
+        await video.play();
+        overlay.classList.add("hidden");
+        resize();
+        running = true;
+        currentCameraFacing = facing;
+        cameraFlipBtn.disabled = false;
+        currentMode = "camera";
+        recordBtn.style.display = "inline-block";
+        processVideoBtn.style.display = "none";
+        requestAnimationFrame(loop);
+        return;
+      } catch (e) {
+        if (facing === facings[facings.length - 1]) {
+          errEl.textContent = "無法啟動鏡頭：" + (e && e.message ? e.message : e) +
+            "（請確認已允許攝影機權限，並在 HTTPS 或 localhost 環境開啟）";
+          errEl.style.display = "block";
+          cameraFlipBtn.disabled = true;
+        }
+      }
+    }
+  }
+
+  cameraModeBtn.addEventListener("click", () => {
+    currentMode = "camera";
+    cameraModeBtn.classList.add("active");
+    videoModeBtn.classList.remove("active");
+    document.getElementById("camera-mode").style.display = "block";
+    document.getElementById("video-mode").style.display = "none";
+    recordBtn.style.display = "inline-block";
+    processVideoBtn.style.display = "none";
+    if (!running) overlay.classList.remove("hidden");
+  });
+
+  videoModeBtn.addEventListener("click", () => {
+    currentMode = "video";
+    videoModeBtn.classList.add("active");
+    cameraModeBtn.classList.remove("active");
+    document.getElementById("camera-mode").style.display = "none";
+    document.getElementById("video-mode").style.display = "block";
+    recordBtn.style.display = "none";
+    processVideoBtn.style.display = "inline-block";
+    overlay.classList.remove("hidden");
+  });
+
+  startBtn.addEventListener("click", () => startCamera(currentCameraFacing));
+
+  cameraFlipBtn.addEventListener("click", () => {
+    const nextFacing = currentCameraFacing === "user" ? "environment" : "user";
+    startCamera(nextFacing);
+  });
+  cameraFlipBtn.disabled = true;
+
+  pauseBtn.addEventListener("click", () => {
+    paused = !paused;
+    pauseBtn.textContent = paused ? "繼續 Resume" : "暫停 Pause";
+  });
+
+  fullscreenBtn.addEventListener("click", () => {
+    if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+    else document.exitFullscreen();
+  });
+  document.addEventListener("fullscreenchange", () => {
+    fullscreenBtn.textContent = document.fullscreenElement ? "離開全螢幕 Exit" : "全螢幕 Fullscreen";
+  });
+
+  snapBtn.addEventListener("click", async () => {
+    try {
+      const filename = "ink-light-flow-" + Date.now() + ".png";
+      canvas.toBlob(async (blob) => {
+        const file = new File([blob], filename, { type: "image/png" });
+
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({ files: [file], title: "水墨光紋 Ink Light Flow" });
+            return;
+          } catch (e) {
+            if (e && e.name === "AbortError") return;
+          }
+        }
+
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        link.click();
+
+        if (/iP(hone|ad|od)/.test(navigator.userAgent)) {
+          window.open(url, "_blank");
+          setTimeout(() => URL.revokeObjectURL(url), 30000);
+        } else {
+          URL.revokeObjectURL(url);
+        }
+      }, "image/png", 0.95);
+    } catch (e) {
+      errEl.textContent = "無法儲存截圖：" + (e && e.message ? e.message : e);
+      errEl.style.display = "block";
+    }
+  });
+
+  let mediaRecorder = null;
+  let recordedChunks = [];
+  let recording = false;
+  let recordStartTime = 0;
+  let recTimerId = null;
+  let pendingVideo = null;
+
+  function clearPendingVideo() {
+    if (pendingVideo) URL.revokeObjectURL(pendingVideo.url);
+    pendingVideo = null;
+    saveVideoBtn.classList.add("hidden");
+  }
+
+  function pickMimeType() {
+    const candidates = [
+      "video/mp4;codecs=avc1.42E01E",
+      "video/mp4;codecs=h264",
+      "video/mp4",
+      "video/webm;codecs=vp9",
+      "video/webm;codecs=vp8",
+      "video/webm",
+    ];
+    for (const type of candidates) {
+      if (window.MediaRecorder && MediaRecorder.isTypeSupported(type)) return type;
+    }
+    return "";
+  }
+
+  function pickBitrate(fps) {
+    const pixels = canvas.width * canvas.height;
+    const bits = pixels * fps * 0.12;
+    return Math.min(40_000_000, Math.max(6_000_000, Math.round(bits)));
+  }
+
+  function startRecording() {
+    if (!running) {
+      errEl.textContent = "請先啟動鏡頭，才能開始錄影。";
+      errEl.style.display = "block";
+      return;
+    }
+    if (!window.MediaRecorder) {
+      errEl.textContent = "此瀏覽器不支援錄影（需要 MediaRecorder）。";
+      errEl.style.display = "block";
+      return;
+    }
+    if (!canvas.captureStream) {
+      errEl.textContent = "此瀏覽器不支援畫布錄影（需要 captureStream）。某些 iOS 設備不支援此功能。";
+      errEl.style.display = "block";
+      return;
+    }
+    clearPendingVideo();
+    const fps = 30;
+    let stream = null;
+    try {
+      stream = canvas.captureStream(fps);
+    } catch (e) {
+      errEl.textContent = "無法擷取畫布流：" + (e && e.message ? e.message : e);
+      errEl.style.display = "block";
+      return;
+    }
+
+    const mimeType = pickMimeType();
+    const videoBitsPerSecond = pickBitrate(fps);
+    recordedChunks = [];
+
+    try {
+      const opts = { videoBitsPerSecond };
+      if (mimeType) opts.mimeType = mimeType;
+      mediaRecorder = new MediaRecorder(stream, opts);
+    } catch (e) {
+      try {
+        mediaRecorder = new MediaRecorder(stream);
+      } catch (e2) {
+        errEl.textContent = "無法啟動錄影：" + (e && e.message ? e.message : e);
+        errEl.style.display = "block";
+        return;
+      }
+    }
+
+    mediaRecorder.ondataavailable = (e) => {
+      if (e.data && e.data.size > 0) recordedChunks.push(e.data);
+    };
+
+    mediaRecorder.onstop = () => {
+      const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || "video/webm" });
+      const ext = (mediaRecorder.mimeType || "").includes("mp4") ? "mp4" : "webm";
+      pendingVideo = {
+        blob,
+        url: URL.createObjectURL(blob),
+        filename: "ink-light-flow-" + Date.now() + "." + ext,
+      };
+      saveVideoBtn.classList.remove("hidden");
+    };
+
+    mediaRecorder.onerror = (e) => {
+      errEl.textContent = "錄影過程出錯：" + (e.error || "未知錯誤");
+      errEl.style.display = "block";
+      recording = false;
+      recordBtn.textContent = "● 開始錄影 Record";
+      recordBtn.classList.remove("recording");
+    };
+
+    try {
+      mediaRecorder.start();
+    } catch (e) {
+      errEl.textContent = "無法開始錄影：" + (e && e.message ? e.message : e);
+      errEl.style.display = "block";
+      return;
+    }
+
+    recording = true;
+    recordStartTime = performance.now();
+    recordBtn.textContent = "■ 停止並下載 Stop";
+    recordBtn.classList.add("recording");
+    recIndicator.classList.remove("hidden");
+    recTimerId = setInterval(() => {
+      const elapsed = Math.floor((performance.now() - recordStartTime) / 1000);
+      const m = Math.floor(elapsed / 60);
+      const s = elapsed % 60;
+      recTimeEl.textContent = m + ":" + String(s).padStart(2, "0");
+    }, 250);
+  }
+
+  function stopRecording() {
+    if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
+    recording = false;
+    recordBtn.textContent = "● 開始錄影 Record";
+    recordBtn.classList.remove("recording");
+    recIndicator.classList.add("hidden");
+    clearInterval(recTimerId);
+  }
+
+  recordBtn.addEventListener("click", () => {
+    if (recording) stopRecording();
+    else startRecording();
+  });
+
+  saveVideoBtn.addEventListener("click", async () => {
+    if (!pendingVideo) return;
+    const { blob, url, filename } = pendingVideo;
+    const file = new File([blob], filename, { type: blob.type });
+
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: "水墨光紋 Ink Light Flow" });
+        clearPendingVideo();
+        return;
+      } catch (e) {
+        if (e && e.name === "AbortError") return;
+      }
+    }
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.click();
+
+    if (/iP(hone|ad|od)/.test(navigator.userAgent)) {
+      window.open(url, "_blank");
+      pendingVideo = null;
+      saveVideoBtn.classList.add("hidden");
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+      return;
+    }
+    clearPendingVideo();
+  });
+
+  // --- 視頻處理功能 ---
+  videoFileInput.addEventListener("change", (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const url = URL.createObjectURL(file);
+    videoSource.src = url;
+    videoSource.onloadedmetadata = () => {
+      const duration = videoSource.duration;
+      const w = videoSource.videoWidth;
+      const h = videoSource.videoHeight;
+      videoInfo.textContent = `${w}×${h} · ${Math.round(duration)}s`;
+      processVideoBtn.disabled = false;
+    };
+  });
+
+  cancelBtn.addEventListener("click", () => {
+    processingCancelled = true;
+    isProcessing = false;
+    progressContainer.classList.remove("visible");
+    cancelBtn.classList.add("hidden");
+    recordBtn.disabled = false;
+    processVideoBtn.disabled = false;
+    errEl.textContent = "視頻處理已取消。";
+    errEl.style.display = "block";
+  });
+
+  processVideoBtn.addEventListener("click", async () => {
+    if (isProcessing) return;
+    if (!videoSource.src) {
+      errEl.textContent = "請先選擇視頻文件。";
+      errEl.style.display = "block";
+      return;
+    }
+
+    isProcessing = true;
+    processingCancelled = false;
+    recordBtn.disabled = true;
+    processVideoBtn.disabled = true;
+    cancelBtn.classList.remove("hidden");
+    progressContainer.classList.add("visible");
+
+    try {
+      await processVideo();
+    } catch (e) {
+      if (!processingCancelled) {
+        errEl.textContent = "視頻處理失敗：" + (e && e.message ? e.message : e);
+        errEl.style.display = "block";
+      }
+    } finally {
+      isProcessing = false;
+      progressContainer.classList.remove("visible");
+      cancelBtn.classList.add("hidden");
+      recordBtn.disabled = false;
+      processVideoBtn.disabled = false;
+    }
+  });
+
+  async function processVideo() {
+    const videoEl = videoSource;
+    const totalFrames = Math.ceil(videoEl.duration * 30); // 假設 30fps
+    let frameCount = 0;
+
+    // 建立錄製流
+    const fps = 30;
+    const stream = canvas.captureStream(fps);
+    const mimeType = pickMimeType();
+    const videoBitsPerSecond = pickBitrate(fps);
+    recordedChunks = [];
+
+    const mediaRec = new MediaRecorder(stream, {
+      mimeType: mimeType || undefined,
+      videoBitsPerSecond,
+    });
+
+    mediaRec.ondataavailable = (e) => {
+      if (e.data && e.data.size > 0) recordedChunks.push(e.data);
+    };
+
+    mediaRec.start();
+
+    // 逐幀處理
+    return new Promise((resolve, reject) => {
+      videoEl.currentTime = 0;
+      let processFrameId = null;
+
+      const processFrame = () => {
+        if (processingCancelled) {
+          mediaRec.stop();
+          resolve();
+          return;
+        }
+
+        // 抽樣並分析
+        sampleCtx.save();
+        sampleCtx.drawImage(videoEl, 0, 0, SAMPLE_W, SAMPLE_H);
+        sampleCtx.restore();
+        const frame = sampleCtx.getImageData(0, 0, SAMPLE_W, SAMPLE_H).data;
+        for (let i = 0, p = 0; i < currLuma.length; i++, p += 4) {
+          currLuma[i] = (frame[p] * 0.299 + frame[p + 1] * 0.587 + frame[p + 2] * 0.114) / 255;
+        }
+
+        if (hasPrev) analyzeAndSpawn();
+        prevLuma.set(currLuma);
+        hasPrev = true;
+
+        // 渲染到畫布
+        const theme = THEMES[ui.theme.value];
+        const trailAlpha = Number(ui.trail.value) / 200;
+        ctx.globalCompositeOperation = "source-over";
+        ctx.fillStyle = `rgba(${theme.bg.join(",")},${trailAlpha})`;
+        ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+
+        strokes = strokes.filter((s) => s.step());
+
+        glowCtx.clearRect(0, 0, glowCanvas.width, glowCanvas.height);
+        glowCtx.globalCompositeOperation = "lighter";
+        glowCtx.lineCap = "round";
+        for (const s of strokes) s.draw(glowCtx, GLOW_SCALE);
+
+        ctx.save();
+        ctx.globalCompositeOperation = theme.blend;
+        ctx.filter = "blur(4px)";
+        ctx.drawImage(glowCanvas, 0, 0, glowCanvas.width, glowCanvas.height, 0, 0, window.innerWidth, window.innerHeight);
+        ctx.restore();
+
+        ctx.save();
+        ctx.globalCompositeOperation = theme.blend;
+        ctx.lineCap = "round";
+        for (const s of strokes) s.draw(ctx, 1);
+        ctx.restore();
+
+        frameCount++;
+        const progress = (frameCount / totalFrames) * 100;
+        progressFill.style.width = progress + "%";
+        progressText.textContent = `${frameCount} / ${totalFrames} frames`;
+
+        // 推進視頻時間
+        videoEl.currentTime += 1 / fps;
+
+        if (frameCount >= totalFrames) {
+          mediaRec.onstop = () => {
+            const blob = new Blob(recordedChunks, { type: mediaRec.mimeType || "video/webm" });
+            const ext = (mediaRec.mimeType || "").includes("mp4") ? "mp4" : "webm";
+            pendingVideo = {
+              blob,
+              url: URL.createObjectURL(blob),
+              filename: "ink-light-flow-processed-" + Date.now() + "." + ext,
+            };
+            saveVideoBtn.classList.remove("hidden");
+            progressText.textContent = "處理完成！";
+            resolve();
+          };
+          mediaRec.stop();
+        } else {
+          processFrameId = requestAnimationFrame(processFrame);
+        }
+      };
+
+      videoEl.oncanplay = () => {
+        processFrameId = requestAnimationFrame(processFrame);
+      };
+
+      videoEl.onerror = () => {
+        reject(new Error("無法載入視頻"));
+      };
+
+      videoEl.load();
+    });
+  }
+
+  function sobelAt(luma, x, y, w, h) {
+    const gx =
+      -luma[idx(x - 1, y - 1)] + luma[idx(x + 1, y - 1)] +
+      -2 * luma[idx(x - 1, y)] + 2 * luma[idx(x + 1, y)] +
+      -luma[idx(x - 1, y + 1)] + luma[idx(x + 1, y + 1)];
+    const gy =
+      -luma[idx(x - 1, y - 1)] - 2 * luma[idx(x, y - 1)] - luma[idx(x + 1, y - 1)] +
+      luma[idx(x - 1, y + 1)] + 2 * luma[idx(x, y + 1)] + luma[idx(x + 1, y + 1)];
+    return { gx, gy };
+    function idx(px, py) {
+      px = Math.min(Math.max(px, 0), w - 1);
+      py = Math.min(Math.max(py, 0), h - 1);
+      return py * w + px;
+    }
+  }
+
+  function analyzeAndSpawn() {
+    const sens = (41 - Number(ui.sensitivity.value)) / 1000;
+    const density = Number(ui.density.value);
+    const strokeLen = Number(ui.stroke.value) / 10;
+    const theme = THEMES[ui.theme.value];
+    const scaleX = window.innerWidth / SAMPLE_W;
+    const scaleY = window.innerHeight / SAMPLE_H;
+
+    for (let y = 1; y < SAMPLE_H - 1; y++) {
+      for (let x = 1; x < SAMPLE_W - 1; x++) {
+        const i = y * SAMPLE_W + x;
+        const diff = Math.abs(currLuma[i] - prevLuma[i]);
+        if (diff <= sens) continue;
+
+        const { gx, gy } = sobelAt(currLuma, x, y, SAMPLE_W, SAMPLE_H);
+        const gradMag = Math.hypot(gx, gy);
+        let angle = Math.atan2(gx, -gy);
+        if (gradMag < 0.02) angle = Math.random() * Math.PI * 2;
+
+        if (Math.random() < density / 10) {
+          const px = x * scaleX + (Math.random() - 0.5) * scaleX;
+          const py = y * scaleY + (Math.random() - 0.5) * scaleY;
+          const speed = 1.2 + diff * 30;
+          const color = theme.strokeColors[Math.floor(Math.random() * theme.strokeColors.length)];
+          strokes.push(new Stroke(px, py, angle, speed, strokeLen, color));
+        }
+      }
+    }
+
+    if (strokes.length > MAX_STROKES) strokes.splice(0, strokes.length - MAX_STROKES);
+  }
+
+  let frameCount = 0;
+  let lastTime = performance.now();
+
+  function loop(now) {
+    if (!running) return;
+    requestAnimationFrame(loop);
+    if (paused) return;
+
+    const activeVideo = currentMode === "camera" ? video : videoSource;
+
+    sampleCtx.save();
+    sampleCtx.drawImage(activeVideo, 0, 0, SAMPLE_W, SAMPLE_H);
+    sampleCtx.restore();
+    const frame = sampleCtx.getImageData(0, 0, SAMPLE_W, SAMPLE_H).data;
+    for (let i = 0, p = 0; i < currLuma.length; i++, p += 4) {
+      currLuma[i] = (frame[p] * 0.299 + frame[p + 1] * 0.587 + frame[p + 2] * 0.114) / 255;
+    }
+
+    if (hasPrev) analyzeAndSpawn();
+    prevLuma.set(currLuma);
+    hasPrev = true;
+
+    const theme = THEMES[ui.theme.value];
+    const trailAlpha = Number(ui.trail.value) / 200;
+    ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = `rgba(${theme.bg.join(",")},${trailAlpha})`;
+    ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+
+    strokes = strokes.filter((s) => s.step());
+
+    glowCtx.clearRect(0, 0, glowCanvas.width, glowCanvas.height);
+    glowCtx.globalCompositeOperation = "lighter";
+    glowCtx.lineCap = "round";
+    for (const s of strokes) s.draw(glowCtx, GLOW_SCALE);
+
+    ctx.save();
+    ctx.globalCompositeOperation = theme.blend;
+    ctx.filter = "blur(4px)";
+    ctx.drawImage(glowCanvas, 0, 0, glowCanvas.width, glowCanvas.height, 0, 0, window.innerWidth, window.innerHeight);
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalCompositeOperation = theme.blend;
+    ctx.lineCap = "round";
+    for (const s of strokes) s.draw(ctx, 1);
+    ctx.restore();
+
+    frameCount++;
+    if (now - lastTime > 500) {
+      const fps = Math.round((frameCount * 1000) / (now - lastTime));
+      statusEl.textContent = `${fps} fps · strokes ${strokes.length}`;
+      frameCount = 0;
+      lastTime = now;
+    }
+  }
+
+  ui.theme.addEventListener("change", resize);
+  resize();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
