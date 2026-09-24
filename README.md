@@ -1,62 +1,72 @@
-Real Estate Workflow Automation: Lead Intelligence & Centralization
-Project Overview
-This project demonstrates a production-ready automation built on Make.com for a real estate firm. It eliminates manual data entry by synchronizing property sourcing information from front-line agents into a centralized cloud database, while providing instant team notifications and AI-driven optimization suggestions.
+# 有鬆島 Yousong Island
 
-1. The Business Challenge
-Real estate agents often spend 30% of their time on administrative tasks. In this specific case, the client faced:
+Taiwan healing ecosystem platform — connecting venues, facilitators, herbs and ingredients across the island.
 
-Data Silos: Property leads were scattered across paper notes, messaging apps, and personal spreadsheets.
+## Tech Stack
 
-Inconsistency: Manual entry led to missing data fields and formatting errors.
+- **Backend**: Node.js + Express
+- **Database**: PostgreSQL (node-postgres)
+- **Scraper**: Puppeteer (Portaly link-in-bio pages)
+- **Frontend**: Static HTML + CSS + vanilla JS
+- **Notifications**: Line Notify + SendGrid
 
-Delayed Action: The time between "finding a property" and "manager review" was 24-48 hours, causing them to miss high-value opportunities.
+## Quick Start
 
-2. The Solution: Automated Lead Pipeline
-I designed an end-to-end automated workflow that acts as the "Digital Nervous System" for the firm:
+```bash
+# Install dependencies
+npm install
 
-Workflow Logic:
-Capture (Trigger): Agents submit property details via a mobile-friendly Google Form or Typeform while on-site.
+# Copy and configure environment
+cp .env.example .env
+# Edit .env with your database URL and API keys
 
-Process (Make.com): * Data is validated and standardized (e.g., currency and area units).
+# Initialize database
+npm run db:init
 
-AI Enrichment: A Gemini API module analyzes the "Description" field to auto-categorize the property type and sentiment.
+# Seed sample data
+npm run db:seed
 
-Storage (Action): Instant synchronization to a Google Sheets/Excel master database.
+# Start development server
+npm run dev
+```
 
-Notification: An immediate summary is sent to the management Slack/Line channel for instant review.
+## API Endpoints
 
-3. Technical Architecture
-Orchestration: Make.com
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/venues` | List venues |
+| GET | `/api/venues/:id` | Get venue detail |
+| POST | `/api/venues` | Create venue |
+| PUT | `/api/venues/:id` | Update venue |
+| DELETE | `/api/venues/:id` | Delete venue |
+| GET | `/api/facilitators` | List facilitators |
+| GET | `/api/herbals` | List herbals |
+| GET | `/api/ingredients` | List ingredients |
+| POST | `/api/scrape` | Scrape a Portaly page |
+| GET | `/api/health` | Health check |
 
-Frontend: Google Forms / Typeform
+Query parameters: `?featured=true`, `?tag=meditation`
 
-Backend: Microsoft Excel / Google Sheets API
+## Scraping Portaly
 
-Intelligence: Google Gemini API (Natural Language Processing)
+```bash
+# Via API
+curl -X POST http://localhost:3000/api/scrape \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://portaly.cc/username", "category": "venue"}'
 
-Communication: Slack / Line Notify
+# Via CLI
+npm run scrape -- https://portaly.cc/username venue
+```
 
-4. Business Impact (ROI)
-Admin Time Saved: Reduced manual data entry time by 95%.
+## Project Structure
 
-Data Accuracy: Achieved 100% consistency in lead formatting.
-
-Lead Response Time: Improved from 24 hours to < 5 minutes, allowing the firm to bid on competitive properties faster.
-
-5. Optimization Roadmap (Consultant’s Vision)
-As an AI Solution Consultant, I proposed the following enhancements to further scale the client's business:
-
-Predictive Lead Scoring: Implement a machine learning model to rank properties based on historical ROI.
-
-Automated Contract Generation: Use the centralized data to auto-fill PDF contract templates via DocuSign or PDF.co.
-
-Market Trend Analysis: Connect the database to a BI tool (like Looker) to visualize price trends across different districts in real-time.
-
-### **5. Workflow Visualization**
-
-```mermaid
-graph LR
-    A[房地產業務輸入表單] --> B{Make.com 邏輯}
-    B --> C[Gemini AI 語意分析]
-    C --> D[Excel 雲端資料庫儲存]
-    D --> E[Line/Slack 團隊即時通知]
+```
+server.js              Express entry point
+db/                    SQL schemas and seed data
+src/config/            Database pool configuration
+src/routes/            REST API route handlers
+src/scraper/           Puppeteer Portaly scraper
+src/notifications/     Line Notify + SendGrid
+public/                Static frontend (HTML/CSS/JS)
+```

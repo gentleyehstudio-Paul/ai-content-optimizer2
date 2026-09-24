@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>有鬆島</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=Noto+Serif+TC:wght@300;400;500;600&family=Poppins:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="ys-header" style="background:var(--dark)">
+    <a href="/" class="ys-logo">
+      <span class="ys-logo-zh">有鬆島</span>
+      <span class="ys-logo-en">YOUSONG</span>
+    </a>
+    <nav class="ys-nav">
+      <a href="/#island">島嶼</a>
+      <a href="/#dimensions">四維</a>
+      <a href="/#rhythm">節氣</a>
+      <a href="/#join">共創</a>
+    </nav>
+  </header>
+
+  <div id="loading" class="ys-loading" style="padding-top:120px">載入中⋯</div>
+
+  <div id="content" style="display:none">
+    <a id="back-link" class="ys-back-link" href="/category/venues">← 返回列表</a>
+
+    <div class="ys-detail-hero">
+      <img id="hero-img" src="" alt="">
+      <div class="ys-detail-hero-overlay"></div>
+      <div class="ys-detail-hero-content">
+        <span class="ys-section-label" style="color:rgba(244,241,234,.55)" id="detail-label"></span>
+        <h1 id="detail-name" style="margin-top:12px"></h1>
+      </div>
+    </div>
+
+    <div class="ys-detail-body">
+      <p id="detail-desc"></p>
+      <div id="detail-meta" class="ys-detail-meta"></div>
+      <div id="detail-tags" class="ys-tags"></div>
+    </div>
+  </div>
+
+  <footer class="ys-footer">
+    <div class="ys-footer-brand">
+      <span style="font-size:15px;letter-spacing:.34em;color:var(--dark)">有鬆島</span>
+      <span style="font-family:var(--font-sans);font-size:9px;letter-spacing:.4em;color:var(--muted)">YOUSONG ISLAND</span>
+    </div>
+    <span class="ys-footer-copy">© 2026 · TAIWAN</span>
+  </footer>
+
+  <script src="/js/detail.js"></script>
+</body>
+</html>
