@@ -722,18 +722,43 @@
         }
 
         function downloadVideo(blob) {
+            console.log('Downloading video, blob size:', blob.size);
+
+            const filename = `ink-light-flow-${Date.now()}.${blob.type.includes('mp4') ? 'mp4' : 'webm'}`;
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `ink-light-flow-${Date.now()}.${blob.type.includes('mp4') ? 'mp4' : 'webm'}`;
+            a.download = filename;
 
-            if (navigator.share && navigator.canShare({ files: [new File([blob], a.download)] })) {
-                navigator.share({ files: [new File([blob], a.download)] });
-            } else {
-                a.click();
-            }
+            // Try Web Share API first (mobile)
+            const tryShare = async () => {
+                if (navigator.share && navigator.canShare) {
+                    try {
+                        const file = new File([blob], filename, { type: blob.type });
+                        if (navigator.canShare({ files: [file] })) {
+                            await navigator.share({ files: [file] });
+                            console.log('Shared via Web Share API');
+                            return true;
+                        }
+                    } catch (err) {
+                        console.log('Web Share cancelled or failed:', err.message);
+                    }
+                }
+                return false;
+            };
 
-            URL.revokeObjectURL(url);
+            tryShare().then((shared) => {
+                if (!shared) {
+                    // Fallback to direct download
+                    console.log('Downloading file:', filename);
+                    a.click();
+                    setTimeout(() => {
+                        URL.revokeObjectURL(url);
+                    }, 100);
+                } else {
+                    URL.revokeObjectURL(url);
+                }
+            });
         }
 
         async function processVideo() {
@@ -938,7 +963,12 @@
         });
 
         document.getElementById('processVideoBtn').addEventListener('click', async () => {
-            await processVideo();
+            console.log('Process video started');
+            const result = await processVideo();
+            console.log('Processing complete, result:', result ? `${result.size} bytes` : 'null');
+            if (result) {
+                console.log('✓ Video processing successful');
+            }
         });
 
         document.getElementById('cancelVideoBtn').addEventListener('click', () => {
@@ -946,11 +976,22 @@
         });
 
         document.getElementById('downloadVideoBtn').addEventListener('click', () => {
+            console.log('Download button clicked');
+            console.log('processedVideoBlob:', processedVideoBlob ? `${processedVideoBlob.size} bytes` : 'null');
+
             if (processedVideoBlob) {
+                console.log('Starting download...');
                 downloadVideo(processedVideoBlob);
-                processedVideoBlob = null;
-                document.getElementById('downloadVideoBtn').style.display = 'none';
-                document.getElementById('processVideoBtn').style.display = 'block';
+
+                setTimeout(() => {
+                    processedVideoBlob = null;
+                    document.getElementById('downloadVideoBtn').style.display = 'none';
+                    document.getElementById('processVideoBtn').style.display = 'block';
+                    alert('✓ 影片處理完成！檔案應已下載。\n\n如果沒看到下載:\n• 檢查瀏覽器的「下載」資料夾\n• 允許此網站的下載權限');
+                }, 500);
+            } else {
+                console.error('No blob available!');
+                alert('❌ 錯誤：沒有可下載的影片檔案\n\n請重新處理');
             }
         });
 
