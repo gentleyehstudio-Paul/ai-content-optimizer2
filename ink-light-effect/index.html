@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>水墨光紋 - 影片轉換工具</title>
+    <title>水墨光紋 - 圖片轉影片工具</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -68,6 +68,17 @@
             font-size: 0.9em;
             margin: 20px 0;
             min-height: 40px;
+            max-height: 100px;
+            overflow-y: auto;
+        }
+
+        .file-item {
+            padding: 5px 0;
+            border-bottom: 1px solid #333;
+        }
+
+        .file-item:last-child {
+            border-bottom: none;
         }
 
         .controls {
@@ -237,24 +248,41 @@
             border: 1px solid rgba(255,100,100,0.4);
             color: #ff6464;
         }
+
+        .preview-area {
+            margin: 20px 0;
+            max-width: 200px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .preview-img {
+            max-width: 100%;
+            max-height: 150px;
+            border-radius: 4px;
+            border: 1px solid #333;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>水墨光紋</h1>
-        <p class="subtitle">將影片轉換為水墨效果</p>
+        <p class="subtitle">將圖片轉換為水墨效果影片</p>
 
         <!-- 上傳區域 -->
         <div class="upload-area" id="uploadArea">
-            <div style="font-size: 2em; margin-bottom: 10px;">📁</div>
-            <div style="color: #fff; margin-bottom: 5px;">點擊或拖拉上傳影片</div>
-            <div style="color: #888; font-size: 0.9em;">支援 MP4、WebM、MOV 等格式</div>
+            <div style="font-size: 2em; margin-bottom: 10px;">🖼️</div>
+            <div style="color: #fff; margin-bottom: 5px;">點擊或拖拉上傳圖片</div>
+            <div style="color: #888; font-size: 0.9em;">支援 JPEG、PNG 等格式（可上傳多張）</div>
         </div>
 
-        <input type="file" id="fileInput" accept="video/*">
+        <input type="file" id="fileInput" accept="image/*" multiple>
 
         <!-- 檔案資訊 -->
         <div class="file-info" id="fileInfo"></div>
+
+        <!-- 預覽 -->
+        <div class="preview-area" id="previewArea"></div>
 
         <!-- 參數控制 -->
         <div class="controls">
@@ -291,6 +319,14 @@
             </div>
 
             <div class="control-group">
+                <label>
+                    影片長度 Video Duration (秒)
+                    <span class="value-display" id="durationValue">5</span>
+                </label>
+                <input type="range" id="duration" min="1" max="30" value="5">
+            </div>
+
+            <div class="control-group">
                 <label>主題 Theme</label>
                 <select id="theme">
                     <option value="dark">墨夜光紋</option>
@@ -319,11 +355,11 @@
         <div class="message" id="message"></div>
     </div>
 
-    <video id="videoSource" style="display:none;"></video>
+    <canvas id="renderCanvas" style="display:none;"></canvas>
 
     <script>
         // 全局狀態
-        let videoFile = null;
+        let images = [];
         let processedBlob = null;
         let processingCancelled = false;
 
@@ -333,7 +369,8 @@
             delay: 9,
             strokeLength: 26,
             density: 5,
-            theme: 'dark'
+            theme: 'dark',
+            duration: 5
         };
 
         // Stroke 類
@@ -450,42 +487,54 @@
             document.getElementById('uploadArea').classList.remove('drag-over');
             const files = e.dataTransfer.files;
             if (files.length > 0) {
-                handleFileSelect(files[0]);
+                handleFilesSelect(Array.from(files));
             }
         });
 
         document.getElementById('fileInput').addEventListener('change', (e) => {
             if (e.target.files.length > 0) {
-                handleFileSelect(e.target.files[0]);
+                handleFilesSelect(Array.from(e.target.files));
             }
         });
 
-        function handleFileSelect(file) {
-            videoFile = file;
-            const url = URL.createObjectURL(file);
-            const video = document.getElementById('videoSource');
-            video.src = url;
+        function handleFilesSelect(files) {
+            images = [];
+            document.getElementById('fileInfo').innerHTML = '';
+            document.getElementById('previewArea').innerHTML = '';
 
-            video.addEventListener('loadedmetadata', () => {
-                const w = video.videoWidth;
-                const h = video.videoHeight;
-                const d = Math.round(video.duration);
-                document.getElementById('fileInfo').textContent = `✓ 已選擇: ${w}×${h} · ${d}秒`;
-                document.getElementById('processBtn').disabled = false;
-            }, { once: true });
-
-            video.addEventListener('error', () => {
-                showMessage(`❌ 無法讀取影片: ${file.name}`, 'error');
-                document.getElementById('processBtn').disabled = true;
-            }, { once: true });
-
-            video.load();
+            Promise.all(files.map(file => {
+                return new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            images.push(img);
+                            const info = document.createElement('div');
+                            info.className = 'file-item';
+                            info.textContent = `✓ ${file.name} (${img.width}×${img.height})`;
+                            document.getElementById('fileInfo').appendChild(info);
+                            resolve();
+                        };
+                        img.src = e.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                });
+            })).then(() => {
+                if (images.length > 0) {
+                    document.getElementById('processBtn').disabled = false;
+                    // 預覽第一張圖片
+                    const preview = document.createElement('img');
+                    preview.src = images[0].src;
+                    preview.className = 'preview-img';
+                    document.getElementById('previewArea').appendChild(preview);
+                }
+            });
         }
 
         // 參數更新
-        ['sensitivity', 'delay', 'strokeLength', 'density'].forEach(name => {
+        ['sensitivity', 'delay', 'strokeLength', 'density', 'duration'].forEach(name => {
             const id = name === 'strokeLength' ? 'strokeLength' : name;
-            const valueName = name === 'strokeLength' ? 'strokeLengthValue' : name === 'density' ? 'densityValue' : name + 'Value';
+            const valueName = name === 'strokeLength' ? 'strokeLengthValue' : name === 'density' ? 'densityValue' : name === 'duration' ? 'durationValue' : name + 'Value';
             document.getElementById(id).addEventListener('input', (e) => {
                 params[name] = parseInt(e.target.value);
                 document.getElementById(valueName).textContent = e.target.value;
@@ -496,12 +545,10 @@
             params.theme = e.target.value;
         });
 
-        // 處理影片
-        async function processVideo() {
-            const video = document.getElementById('videoSource');
-
-            if (video.videoWidth === 0 || video.videoHeight === 0 || !video.duration) {
-                showMessage('❌ 影片未完全載入', 'error');
+        // 處理圖片生成影片
+        async function processImages() {
+            if (images.length === 0) {
+                showMessage('❌ 請先上傳圖片', 'error');
                 return;
             }
 
@@ -511,9 +558,10 @@
             document.getElementById('cancelBtn').style.display = 'block';
 
             return new Promise((resolve) => {
-                const canvas = document.createElement('canvas');
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
+                const canvas = document.getElementById('renderCanvas');
+                const firstImage = images[0];
+                canvas.width = firstImage.width;
+                canvas.height = firstImage.height;
                 const ctx = canvas.getContext('2d');
 
                 const stream = canvas.captureStream(30);
@@ -538,13 +586,11 @@
                 };
 
                 recorder.start();
-                video.currentTime = 0;
 
                 const fps = 30;
-                const totalFrames = Math.ceil(video.duration * fps);
+                const totalFrames = params.duration * fps;
                 let currentFrame = 0;
                 let strokes = [];
-                let prevFrame = null;
 
                 const processFrame = () => {
                     if (processingCancelled) {
@@ -557,17 +603,18 @@
                         return;
                     }
 
-                    video.currentTime = currentFrame / fps;
-                };
+                    // 循環選擇圖片
+                    const imgIndex = currentFrame % (params.duration * fps) % images.length;
+                    const currentImage = images[Math.floor(imgIndex * images.length / (params.duration * fps))];
 
-                video.onseeked = () => {
-                    ctx.drawImage(video, 0, 0);
+                    ctx.drawImage(currentImage, 0, 0);
 
+                    // 縮小取樣
                     const sampleCanvas = document.createElement('canvas');
                     sampleCanvas.width = 96;
                     sampleCanvas.height = 54;
                     const sampleCtx = sampleCanvas.getContext('2d');
-                    sampleCtx.drawImage(video, 0, 0, 96, 54);
+                    sampleCtx.drawImage(currentImage, 0, 0, 96, 54);
                     const frame = sampleCtx.getImageData(0, 0, 96, 54);
 
                     // 背景褪色
@@ -580,13 +627,9 @@
                     }
                     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-                    if (prevFrame) {
-                        const newStrokes = analyzeFrame(frame, 96, 54);
-                        strokes = strokes.concat(newStrokes).filter(s => s.isAlive());
-                        strokes.forEach(s => s.update());
-                    }
-
-                    prevFrame = frame;
+                    const newStrokes = analyzeFrame(frame, 96, 54);
+                    strokes = strokes.concat(newStrokes).filter(s => s.isAlive());
+                    strokes.forEach(s => s.update());
 
                     const scaleX = canvas.width / 96;
                     const scaleY = canvas.height / 54;
@@ -614,7 +657,7 @@
         }
 
         document.getElementById('processBtn').addEventListener('click', async () => {
-            await processVideo();
+            await processImages();
         });
 
         document.getElementById('cancelBtn').addEventListener('click', () => {
