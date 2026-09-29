@@ -92,7 +92,7 @@ export function Footer() {
               </li>
               <li>
                 <a
-                  href="https://linkedin.com"
+                  href="https://www.linkedin.com/in/paul-yeh-82a185154/"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-[14px] text-ink hover:text-red"

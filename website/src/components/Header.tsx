@@ -64,12 +64,14 @@ export function Header() {
                 {item.label}
               </Link>
             ))}
-            <Link
-              href="/#contact"
+            <a
+              href="https://lin.ee/gentleyehstudio"
+              target="_blank"
+              rel="noopener noreferrer"
               className="ml-2 px-5 py-2 text-[14px] font-semibold rounded-full border border-ink text-ink hover:bg-red hover:text-white hover:border-red transition-all"
             >
               預約諮詢
-            </Link>
+            </a>
           </nav>
 
           <button
@@ -103,13 +105,15 @@ export function Header() {
                 {item.label}
               </Link>
             ))}
-            <Link
-              href="/#contact"
+            <a
+              href="https://lin.ee/gentleyehstudio"
+              target="_blank"
+              rel="noopener noreferrer"
               onClick={() => setMenuOpen(false)}
               className="mt-4 text-center px-8 py-4 text-[16px] font-semibold rounded-full bg-ink text-white hover:bg-red transition-colors"
             >
               預約諮詢
-            </Link>
+            </a>
           </nav>
         </div>
       )}

@@ -545,7 +545,9 @@ export default function HomePage() {
           </p>
 
           <a
-            href="#"
+            href="https://lin.ee/gentleyehstudio"
+            target="_blank"
+            rel="noopener noreferrer"
             className="inline-flex items-center gap-2 mt-8 px-10 py-4 bg-white text-ink font-semibold text-[15px] rounded-full hover:bg-red hover:text-white transition-all"
           >
             預約 30 分鐘諮詢
@@ -566,7 +568,9 @@ export default function HomePage() {
               掃描加好友，直接傳圖問
             </p>
             <a
-              href="#"
+              href="https://lin.ee/gentleyehstudio"
+              target="_blank"
+              rel="noopener noreferrer"
               className="mt-2 text-[14px] text-white hover:text-red transition-colors"
             >
               加入好友 →

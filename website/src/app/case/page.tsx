@@ -169,7 +169,7 @@ export default function CasePage() {
                     className="font-bold text-ink"
                     style={{ fontSize: "clamp(34px, 3.8vw, 48px)" }}
                   >
-                    — 天 → — 天
+                    1–2 天
                   </p>
                 </div>
                 <div>
@@ -180,12 +180,12 @@ export default function CasePage() {
                     className="font-bold text-ink"
                     style={{ fontSize: "clamp(34px, 3.8vw, 48px)" }}
                   >
-                    — 張 / 週
+                    3,000+ 張
                   </p>
                 </div>
               </div>
               <p className="text-[12px] text-text-muted mt-6">
-                待填入客戶授權的實際數據
+                經客戶授權公開之實際數據
               </p>
             </div>
             <div className="flex items-center justify-between mt-auto pt-8">

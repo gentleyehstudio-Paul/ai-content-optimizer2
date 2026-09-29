@@ -39,14 +39,14 @@ const PRICING = [
   {
     tag: "PAY PER USE",
     name: "單次",
-    price: "NT$ —",
+    price: "NT$ 3,800",
     desc: "臨時要送印的專案",
     featured: false,
   },
   {
     tag: "SUBSCRIPTION",
     name: "訂閱",
-    price: "NT$ — / 月",
+    price: "NT$ 680 / 月",
     desc: "行銷團隊的固定產能",
     featured: false,
   },
@@ -189,7 +189,7 @@ export default function PrintScalePage() {
             方案與價格
           </h2>
           <p className="text-[12px] text-text-muted mb-10">
-            實際方案與價格待定
+            所有方案均含 CMYK 轉檔與授權說明
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
