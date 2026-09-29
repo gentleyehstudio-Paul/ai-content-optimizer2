@@ -1,0 +1,35 @@
+@import "tailwindcss";
+@import "@fontsource-variable/manrope";
+
+@theme {
+  --color-ink: #191a18;
+  --color-paper: #eeede8;
+  --color-paper-alt: #f7f6f2;
+  --color-dark: #1e261f;
+  --color-near-black: #050505;
+  --color-red: #a63328;
+  --color-hairline: #d8d9d1;
+  --color-text-secondary: #5d645b;
+  --color-text-muted: #4e554e;
+  --font-sans: "Manrope Variable", "PingFang TC", "Noto Sans TC",
+    "Microsoft JhengHei", sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  color: #191a18;
+  background: #eeede8;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: inherit;
+  transition: color 0.2s;
+}
+a:hover {
+  color: #a63328;
+}
