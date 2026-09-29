@@ -666,21 +666,45 @@
 
         document.getElementById('videoFileInput').addEventListener('change', (e) => {
             const file = e.target.files[0];
-            if (file) {
-                const url = URL.createObjectURL(file);
-                videoSource.src = url;
-                videoSource.load();
+            if (!file) return;
 
-                const updateInfo = () => {
-                    if (videoSource.videoWidth && videoSource.videoHeight && videoSource.duration) {
-                        document.getElementById('videoInfo').textContent =
-                            `${videoSource.videoWidth}×${videoSource.videoHeight} · ${Math.round(videoSource.duration)}s`;
-                    }
-                };
+            console.log('=== Video File Selected ===');
+            console.log('Name:', file.name);
+            console.log('Type:', file.type);
+            console.log('Size:', (file.size / 1024 / 1024).toFixed(2), 'MB');
 
-                videoSource.addEventListener('loadedmetadata', updateInfo);
-                videoSource.addEventListener('canplay', updateInfo);
-            }
+            const url = URL.createObjectURL(file);
+            videoSource.src = url;
+            videoSource.crossOrigin = 'anonymous';
+
+            const updateInfo = () => {
+                const w = videoSource.videoWidth;
+                const h = videoSource.videoHeight;
+                const d = videoSource.duration;
+
+                console.log('Video Metadata:', w, 'x', h, '@', d ? d.toFixed(2) : '?', 's');
+
+                if (w && h && d) {
+                    document.getElementById('videoInfo').textContent =
+                        `${w}×${h} · ${Math.round(d)}s`;
+                    console.log('✓ Video ready');
+                }
+            };
+
+            const onError = () => {
+                const err = videoSource.error;
+                const msg = err ? ['', 'ABORTED', 'NETWORK', 'DECODE'][err.code] : 'UNKNOWN';
+                console.error('❌ Video Error:', msg);
+                document.getElementById('videoInfo').textContent =
+                    `❌ 無法載入 (${msg})\n試試: Chrome、MP4格式、或檢查影片`;
+            };
+
+            videoSource.addEventListener('loadedmetadata', updateInfo);
+            videoSource.addEventListener('canplay', updateInfo);
+            videoSource.addEventListener('loadeddata', updateInfo);
+            videoSource.addEventListener('error', onError);
+            videoSource.load();
+            console.log('Loading video...');
         });
 
         function pickMimeType() {
@@ -713,8 +737,21 @@
         }
 
         async function processVideo() {
-            if (!videoSource.src || videoSource.videoWidth === 0 || videoSource.videoHeight === 0) {
-                alert('請先選擇有效的影片檔案');
+            if (!videoSource.src) {
+                alert('請先選擇影片檔案');
+                return;
+            }
+
+            if (videoSource.videoWidth === 0 || videoSource.videoHeight === 0 || !videoSource.duration) {
+                console.error('Video not ready:', {
+                    src: !!videoSource.src,
+                    width: videoSource.videoWidth,
+                    height: videoSource.videoHeight,
+                    duration: videoSource.duration,
+                    readyState: videoSource.readyState,
+                    error: videoSource.error
+                });
+                alert('影片未完全載入，請稍候後重試\n\n如問題持續:\n• 嘗試其他瀏覽器\n• 試試轉換為 MP4 格式\n• 檢查影片檔案是否損壞');
                 return;
             }
 
