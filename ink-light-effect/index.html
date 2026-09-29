@@ -338,7 +338,7 @@
     <div class="container">
         <div class="header">
             <h1>水墨光紋 · INK LIGHT FLOW</h1>
-            <p>本程式使用開放式演算模型（非固定黑箱），即時分析鏡頭畫面或視頻的<br>明暗梯度與動變化，將其轉換流動的水墨光紋筆觸。需要攝影機權限，且須在 HTTPS 或 localhost 環境下執行。</p>
+            <p>本程式使用開放式演算模型（非固定黑箱），即時分析鏡頭畫面或影片的<br>明暗梯度與動變化，將其轉換流動的水墨光紋筆觸。需要攝影機權限，且須在 HTTPS 或 localhost 環境下執行。</p>
         </div>
 
         <div class="mode-tabs">
@@ -465,7 +465,7 @@
     <video id="videoSource"></video>
 
     <script>
-        // Stroke class for particle effect
+        // Stroke class
         class Stroke {
             constructor(x, y, angle, length, color, opacity = 1.0) {
                 this.x = x;
@@ -529,15 +529,14 @@
 
         let processingCancelled = false;
         let isProcessing = false;
+        let processedVideoBlob = null;
 
-        // Resize canvas
         function resizeCanvas() {
             const rect = canvas.parentElement.getBoundingClientRect();
             canvas.width = rect.width;
             canvas.height = rect.height;
         }
 
-        // Get theme colors
         function getThemeColors() {
             switch (theme) {
                 case 'paper':
@@ -549,21 +548,17 @@
             }
         }
 
-        // Sobel gradient analysis
         function analyzeAndSpawn(frame, width, height) {
             const data = frame.data;
             const newStrokes = [];
 
-            // Sobel operator
             for (let y = 1; y < height - 1; y++) {
                 for (let x = 1; x < width - 1; x++) {
                     const idx = (y * width + x) * 4;
 
-                    // Sobel Gx
                     const gx = -data[(y - 1) * width * 4 + (x - 1) * 4] - 2 * data[(y) * width * 4 + (x - 1) * 4] - data[(y + 1) * width * 4 + (x - 1) * 4]
                         + data[(y - 1) * width * 4 + (x + 1) * 4] + 2 * data[(y) * width * 4 + (x + 1) * 4] + data[(y + 1) * width * 4 + (x + 1) * 4];
 
-                    // Sobel Gy
                     const gy = data[(y - 1) * width * 4 + (x - 1) * 4] + 2 * data[(y - 1) * width * 4 + x * 4] + data[(y - 1) * width * 4 + (x + 1) * 4]
                         - data[(y + 1) * width * 4 + (x - 1) * 4] - 2 * data[(y + 1) * width * 4 + x * 4] - data[(y + 1) * width * 4 + (x + 1) * 4];
 
@@ -594,14 +589,12 @@
             return newStrokes;
         }
 
-        // Main rendering loop
         function loop() {
             if (!cameraActive && currentMode === 'camera') return;
 
             const source = currentMode === 'camera' ? video : videoSource;
 
             if (source.readyState === source.HAVE_ENOUGH_DATA) {
-                // Sample at low resolution
                 const sampleCanvas = document.createElement('canvas');
                 sampleCanvas.width = 96;
                 sampleCanvas.height = 54;
@@ -618,7 +611,6 @@
 
                 prevFrame = frame;
 
-                // Render to canvas
                 const { glowColor } = getThemeColors();
                 if (theme === 'paper') {
                     ctx.fillStyle = 'rgba(240, 235, 220, 0.1)';
@@ -629,19 +621,17 @@
                 }
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-                // Scale and draw strokes
                 const scaleX = canvas.width / 96;
                 const scaleY = canvas.height / 54;
 
                 ctx.save();
-                ctx.scale(scaleX, scaleY);
-
                 if (theme === 'paper') {
                     ctx.globalCompositeOperation = 'multiply';
                 } else {
                     ctx.globalCompositeOperation = 'lighter';
                 }
 
+                ctx.scale(scaleX, scaleY);
                 strokes.forEach(stroke => stroke.draw(ctx));
                 ctx.restore();
             }
@@ -649,7 +639,6 @@
             requestAnimationFrame(loop);
         }
 
-        // Camera initialization
         async function startCamera() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({
@@ -675,190 +664,25 @@
             }
         }
 
-        // Video file handling
         document.getElementById('videoFileInput').addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (file) {
                 const url = URL.createObjectURL(file);
                 videoSource.src = url;
+                videoSource.load();
 
-                videoSource.onloadedmetadata = () => {
-                    const width = videoSource.videoWidth;
-                    const height = videoSource.videoHeight;
-                    const duration = videoSource.duration;
-                    document.getElementById('videoInfo').textContent = `${width}×${height} · ${Math.round(duration)}s`;
+                const updateInfo = () => {
+                    if (videoSource.videoWidth && videoSource.videoHeight && videoSource.duration) {
+                        document.getElementById('videoInfo').textContent =
+                            `${videoSource.videoWidth}×${videoSource.videoHeight} · ${Math.round(videoSource.duration)}s`;
+                    }
                 };
+
+                videoSource.addEventListener('loadedmetadata', updateInfo);
+                videoSource.addEventListener('canplay', updateInfo);
             }
         });
 
-        // Video processing
-        let processedVideoBlob = null;
-
-        async function processVideo() {
-            if (!videoSource.src) {
-                alert('請先選擇影片');
-                return;
-            }
-
-            isProcessing = true;
-            processingCancelled = false;
-            processedVideoBlob = null;
-            recordedChunks = [];
-
-            const progressContainer = document.getElementById('progressContainer');
-            progressContainer.classList.add('active');
-
-            document.getElementById('processVideoBtn').style.display = 'none';
-            document.getElementById('cancelVideoBtn').style.display = 'block';
-
-            // Wait for video metadata to load
-            return new Promise((resolve) => {
-                const startProcessing = () => {
-                    const canvas = document.createElement('canvas');
-                    canvas.width = videoSource.videoWidth;
-                    canvas.height = videoSource.videoHeight;
-                    const ctx = canvas.getContext('2d');
-
-                    if (canvas.width === 0 || canvas.height === 0) {
-                        alert('無法讀取影片資訊');
-                        isProcessing = false;
-                        progressContainer.classList.remove('active');
-                        document.getElementById('processVideoBtn').style.display = 'block';
-                        document.getElementById('cancelVideoBtn').style.display = 'none';
-                        resolve(null);
-                        return;
-                    }
-
-                    const stream = canvas.captureStream(30);
-                    const mimeType = pickMimeType();
-                    const mediaRecorder = new MediaRecorder(stream, {
-                        mimeType: mimeType,
-                        videoBitsPerSecond: calculateBitrate(canvas.width, canvas.height)
-                    });
-
-                    mediaRecorder.ondataavailable = (e) => {
-                        if (e.data.size > 0) {
-                            recordedChunks.push(e.data);
-                        }
-                    };
-
-                    mediaRecorder.onstop = () => {
-                        processedVideoBlob = new Blob(recordedChunks, { type: mimeType });
-                        recordedChunks = [];
-                        isProcessing = false;
-                        progressContainer.classList.remove('active');
-                        document.getElementById('processVideoBtn').style.display = 'none';
-                        document.getElementById('downloadVideoBtn').style.display = 'block';
-                        document.getElementById('cancelVideoBtn').style.display = 'none';
-                        resolve(processedVideoBlob);
-                    };
-
-                    mediaRecorder.start();
-
-                    // Reset video to start
-                    videoSource.currentTime = 0;
-
-                    const fps = 30;
-                    const totalFrames = Math.ceil(videoSource.duration * fps);
-                    let currentFrame = 0;
-                    let prevFrameData = null;
-                    let processingStrokeList = [];
-                    let seekPending = false;
-
-                    const processNextFrame = () => {
-                        if (processingCancelled) {
-                            mediaRecorder.stop();
-                            return;
-                        }
-
-                        if (currentFrame >= totalFrames) {
-                            mediaRecorder.stop();
-                            return;
-                        }
-
-                        const time = (currentFrame / fps);
-                        videoSource.currentTime = time;
-                        seekPending = true;
-                    };
-
-                    const onVideoSeeked = () => {
-                        if (!seekPending) return;
-                        seekPending = false;
-
-                        try {
-                            // Draw video frame
-                            ctx.drawImage(videoSource, 0, 0);
-
-                            // Sample and analyze
-                            const sampleCanvas = document.createElement('canvas');
-                            sampleCanvas.width = 96;
-                            sampleCanvas.height = 54;
-                            const sampleCtx = sampleCanvas.getContext('2d');
-                            sampleCtx.drawImage(videoSource, 0, 0, 96, 54);
-                            const frame = sampleCtx.getImageData(0, 0, 96, 54);
-
-                            // Apply fade effect
-                            if (theme === 'paper') {
-                                ctx.fillStyle = 'rgba(240, 235, 220, 0.05)';
-                            } else if (theme === 'aurora') {
-                                ctx.fillStyle = 'rgba(20, 20, 40, 0.05)';
-                            } else {
-                                ctx.fillStyle = 'rgba(10, 10, 20, 0.05)';
-                            }
-                            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-                            // Analyze and generate strokes
-                            if (prevFrameData) {
-                                const newStrokes = analyzeAndSpawn(frame, 96, 54);
-                                processingStrokeList = processingStrokeList.concat(newStrokes).filter(s => s.isAlive());
-                                processingStrokeList.forEach(s => s.update());
-                            }
-
-                            prevFrameData = frame;
-
-                            // Render strokes
-                            const scaleX = canvas.width / 96;
-                            const scaleY = canvas.height / 54;
-
-                            ctx.save();
-                            if (theme === 'paper') {
-                                ctx.globalCompositeOperation = 'multiply';
-                            } else {
-                                ctx.globalCompositeOperation = 'lighter';
-                            }
-                            ctx.scale(scaleX, scaleY);
-                            processingStrokeList.forEach(stroke => stroke.draw(ctx));
-                            ctx.restore();
-
-                            // Update progress
-                            currentFrame++;
-                            const progress = (currentFrame / totalFrames) * 100;
-                            document.getElementById('progressFill').style.width = progress + '%';
-                            document.getElementById('progressText').textContent = `${currentFrame} / ${totalFrames} frames (${Math.round(progress)}%)`;
-
-                            // Schedule next frame
-                            setTimeout(processNextFrame, 10);
-                        } catch (err) {
-                            console.error('Processing error:', err);
-                            setTimeout(processNextFrame, 10);
-                        }
-                    };
-
-                    videoSource.addEventListener('seeked', onVideoSeeked);
-
-                    // Start processing
-                    processNextFrame();
-                };
-
-                if (videoSource.readyState >= 1) {
-                    startProcessing();
-                } else {
-                    videoSource.addEventListener('loadedmetadata', startProcessing, { once: true });
-                }
-            });
-        }
-
-        // Helper functions
         function pickMimeType() {
             const types = ['video/mp4', 'video/webm'];
             for (const type of types) {
@@ -873,7 +697,6 @@
             return Math.min(40000000, Math.max(6000000, baseBitrate));
         }
 
-        // Download function
         function downloadVideo(blob) {
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -889,6 +712,154 @@
             URL.revokeObjectURL(url);
         }
 
+        async function processVideo() {
+            if (!videoSource.src || videoSource.videoWidth === 0 || videoSource.videoHeight === 0) {
+                alert('請先選擇有效的影片檔案');
+                return;
+            }
+
+            isProcessing = true;
+            processingCancelled = false;
+            processedVideoBlob = null;
+            recordedChunks = [];
+
+            const progressContainer = document.getElementById('progressContainer');
+            progressContainer.classList.add('active');
+
+            document.getElementById('processVideoBtn').style.display = 'none';
+            document.getElementById('cancelVideoBtn').style.display = 'block';
+
+            return new Promise((resolve) => {
+                const processStart = () => {
+                    try {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = videoSource.videoWidth;
+                        canvas.height = videoSource.videoHeight;
+                        const ctx = canvas.getContext('2d');
+
+                        const stream = canvas.captureStream(30);
+                        const mimeType = pickMimeType();
+                        const recorder = new MediaRecorder(stream, {
+                            mimeType: mimeType,
+                            videoBitsPerSecond: calculateBitrate(canvas.width, canvas.height)
+                        });
+
+                        recorder.ondataavailable = (e) => {
+                            if (e.data.size > 0) recordedChunks.push(e.data);
+                        };
+
+                        recorder.onstop = () => {
+                            processedVideoBlob = new Blob(recordedChunks, { type: mimeType });
+                            recordedChunks = [];
+                            isProcessing = false;
+                            progressContainer.classList.remove('active');
+                            document.getElementById('processVideoBtn').style.display = 'none';
+                            document.getElementById('downloadVideoBtn').style.display = 'block';
+                            document.getElementById('cancelVideoBtn').style.display = 'none';
+                            resolve(processedVideoBlob);
+                        };
+
+                        recorder.start();
+                        videoSource.currentTime = 0;
+
+                        const fps = 30;
+                        const totalFrames = Math.ceil(videoSource.duration * fps);
+                        let currentFrame = 0;
+                        let prevFrameData = null;
+                        let processingStrokes = [];
+
+                        const processFrame = () => {
+                            if (processingCancelled || currentFrame >= totalFrames) {
+                                if (processingCancelled) {
+                                    recorder.stop();
+                                    isProcessing = false;
+                                    progressContainer.classList.remove('active');
+                                    document.getElementById('processVideoBtn').style.display = 'block';
+                                    document.getElementById('cancelVideoBtn').style.display = 'none';
+                                    resolve(null);
+                                } else {
+                                    recorder.stop();
+                                }
+                                return;
+                            }
+
+                            videoSource.currentTime = currentFrame / fps;
+                        };
+
+                        videoSource.onseeked = () => {
+                            try {
+                                ctx.drawImage(videoSource, 0, 0);
+
+                                const sampleCanvas = document.createElement('canvas');
+                                sampleCanvas.width = 96;
+                                sampleCanvas.height = 54;
+                                const sampleCtx = sampleCanvas.getContext('2d');
+                                sampleCtx.drawImage(videoSource, 0, 0, 96, 54);
+                                const frame = sampleCtx.getImageData(0, 0, 96, 54);
+
+                                if (theme === 'paper') {
+                                    ctx.fillStyle = 'rgba(240, 235, 220, 0.05)';
+                                } else if (theme === 'aurora') {
+                                    ctx.fillStyle = 'rgba(20, 20, 40, 0.05)';
+                                } else {
+                                    ctx.fillStyle = 'rgba(10, 10, 20, 0.05)';
+                                }
+                                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                                if (prevFrameData) {
+                                    const newStrokes = analyzeAndSpawn(frame, 96, 54);
+                                    processingStrokes = processingStrokes.concat(newStrokes).filter(s => s.isAlive());
+                                    processingStrokes.forEach(s => s.update());
+                                }
+
+                                prevFrameData = frame;
+
+                                const scaleX = canvas.width / 96;
+                                const scaleY = canvas.height / 54;
+
+                                ctx.save();
+                                if (theme === 'paper') {
+                                    ctx.globalCompositeOperation = 'multiply';
+                                } else {
+                                    ctx.globalCompositeOperation = 'lighter';
+                                }
+                                ctx.scale(scaleX, scaleY);
+                                processingStrokes.forEach(stroke => stroke.draw(ctx));
+                                ctx.restore();
+
+                                currentFrame++;
+                                const progress = (currentFrame / totalFrames) * 100;
+                                document.getElementById('progressFill').style.width = progress + '%';
+                                document.getElementById('progressText').textContent =
+                                    `${currentFrame} / ${totalFrames} frames (${Math.round(progress)}%)`;
+
+                                setTimeout(processFrame, 5);
+                            } catch (err) {
+                                console.error('Frame error:', err);
+                                setTimeout(processFrame, 5);
+                            }
+                        };
+
+                        processFrame();
+                    } catch (err) {
+                        console.error('Setup error:', err);
+                        alert('處理失敗: ' + err.message);
+                        isProcessing = false;
+                        progressContainer.classList.remove('active');
+                        document.getElementById('processVideoBtn').style.display = 'block';
+                        document.getElementById('cancelVideoBtn').style.display = 'none';
+                        resolve(null);
+                    }
+                };
+
+                if (videoSource.readyState >= 2) {
+                    processStart();
+                } else {
+                    videoSource.addEventListener('canplay', processStart, { once: true });
+                }
+            });
+        }
+
         // Event listeners
         document.getElementById('startCamera').addEventListener('click', startCamera);
 
@@ -901,9 +872,7 @@
         document.getElementById('recordBtn').addEventListener('click', () => {
             recordedChunks = [];
             const stream = canvas.captureStream(30);
-            mediaRecorder = new MediaRecorder(stream, {
-                mimeType: pickMimeType()
-            });
+            mediaRecorder = new MediaRecorder(stream, { mimeType: pickMimeType() });
 
             mediaRecorder.ondataavailable = (e) => {
                 recordedChunks.push(e.data);
@@ -932,32 +901,22 @@
         });
 
         document.getElementById('processVideoBtn').addEventListener('click', async () => {
-            const blob = await processVideo();
-            if (blob && !processingCancelled) {
-                console.log('Video processing complete, blob size:', blob.size);
-            }
+            await processVideo();
         });
 
         document.getElementById('cancelVideoBtn').addEventListener('click', () => {
             processingCancelled = true;
-            document.getElementById('progressContainer').classList.remove('active');
-            document.getElementById('processVideoBtn').style.display = 'block';
-            document.getElementById('cancelVideoBtn').style.display = 'none';
         });
 
         document.getElementById('downloadVideoBtn').addEventListener('click', () => {
             if (processedVideoBlob) {
-                console.log('Downloading video, size:', processedVideoBlob.size);
                 downloadVideo(processedVideoBlob);
                 processedVideoBlob = null;
                 document.getElementById('downloadVideoBtn').style.display = 'none';
                 document.getElementById('processVideoBtn').style.display = 'block';
-            } else {
-                alert('沒有處理過的影片可下載');
             }
         });
 
-        // Parameter update listeners
         ['sensitivity', 'delay', 'strokeLength', 'particleDensity', 'theme'].forEach(param => {
             const elem = document.getElementById(param);
             if (elem) {
@@ -981,7 +940,6 @@
             }
         });
 
-        // Mode switching
         document.querySelectorAll('.mode-tab').forEach(tab => {
             tab.addEventListener('click', () => {
                 const mode = tab.dataset.mode;
@@ -992,14 +950,9 @@
 
                 document.querySelectorAll('.mode-content').forEach(content => content.classList.remove('active'));
                 document.getElementById(`${mode}-mode`).classList.add('active');
-
-                if (mode === 'camera' && !cameraActive) {
-                    // Keep camera off until user clicks start
-                }
             });
         });
 
-        // Initial setup
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
     </script>
