@@ -343,7 +343,7 @@
 
         <div class="mode-tabs">
             <button class="mode-tab active" data-mode="camera">📷 即時鏡頭 Camera</button>
-            <button class="mode-tab" data-mode="video">🎬 視頻處理 Video</button>
+            <button class="mode-tab" data-mode="video">🎬 影片處理 Video</button>
         </div>
 
         <!-- Camera Mode -->
@@ -402,8 +402,8 @@
         <div class="mode-content" id="video-mode">
             <div class="video-only-mode">
                 <div class="video-info-large">
-                    <p style="margin-bottom: 20px;">📁 選擇視頻 Select Video</p>
-                    <label class="file-input-label" for="videoFileInput">📁 選擇視頻 Select Video</label>
+                    <p style="margin-bottom: 20px;">📁 選擇影片 Select Video</p>
+                    <label class="file-input-label" for="videoFileInput">📁 選擇影片 Select Video</label>
                     <input type="file" id="videoFileInput" accept="video/*">
                     <div id="videoInfo" class="video-info" style="margin-top: 20px;">0×0 · 0s</div>
                 </div>
@@ -696,13 +696,14 @@
 
         async function processVideo() {
             if (!videoSource.src) {
-                alert('請先選擇視頻');
+                alert('請先選擇影片');
                 return;
             }
 
             isProcessing = true;
             processingCancelled = false;
             processedVideoBlob = null;
+            recordedChunks = [];
 
             const progressContainer = document.getElementById('progressContainer');
             progressContainer.classList.add('active');
@@ -710,68 +711,80 @@
             document.getElementById('processVideoBtn').style.display = 'none';
             document.getElementById('cancelVideoBtn').style.display = 'block';
 
-            const canvas = document.createElement('canvas');
-            canvas.width = videoSource.videoWidth;
-            canvas.height = videoSource.videoHeight;
-            const ctx = canvas.getContext('2d');
-
-            const stream = canvas.captureStream(30);
-            const mediaRecorder = new MediaRecorder(stream, {
-                mimeType: pickMimeType(),
-                videoBitsPerSecond: calculateBitrate(canvas.width, canvas.height)
-            });
-
-            recordedChunks = [];
-
+            // Wait for video metadata to load
             return new Promise((resolve) => {
-                mediaRecorder.ondataavailable = (e) => {
-                    if (e.data.size > 0) {
-                        recordedChunks.push(e.data);
-                    }
-                };
+                const startProcessing = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = videoSource.videoWidth;
+                    canvas.height = videoSource.videoHeight;
+                    const ctx = canvas.getContext('2d');
 
-                mediaRecorder.onstop = () => {
-                    processedVideoBlob = new Blob(recordedChunks, { type: mediaRecorder.mimeType });
-                    recordedChunks = [];
-                    resolve(processedVideoBlob);
-                };
-
-                mediaRecorder.start();
-
-                // Process frames
-                const fps = 30;
-                const frameDuration = 1000 / fps;
-                const totalFrames = Math.ceil(videoSource.duration * fps);
-
-                let currentFrame = 0;
-                let prevFrameData = null;
-                let processingStrokeList = [];
-
-                const processFrame = () => {
-                    if (processingCancelled) {
-                        mediaRecorder.stop();
+                    if (canvas.width === 0 || canvas.height === 0) {
+                        alert('無法讀取影片資訊');
+                        isProcessing = false;
                         progressContainer.classList.remove('active');
                         document.getElementById('processVideoBtn').style.display = 'block';
                         document.getElementById('cancelVideoBtn').style.display = 'none';
-                        isProcessing = false;
                         resolve(null);
                         return;
                     }
 
-                    if (currentFrame >= totalFrames) {
-                        mediaRecorder.stop();
+                    const stream = canvas.captureStream(30);
+                    const mimeType = pickMimeType();
+                    const mediaRecorder = new MediaRecorder(stream, {
+                        mimeType: mimeType,
+                        videoBitsPerSecond: calculateBitrate(canvas.width, canvas.height)
+                    });
+
+                    mediaRecorder.ondataavailable = (e) => {
+                        if (e.data.size > 0) {
+                            recordedChunks.push(e.data);
+                        }
+                    };
+
+                    mediaRecorder.onstop = () => {
+                        processedVideoBlob = new Blob(recordedChunks, { type: mimeType });
+                        recordedChunks = [];
+                        isProcessing = false;
                         progressContainer.classList.remove('active');
                         document.getElementById('processVideoBtn').style.display = 'none';
                         document.getElementById('downloadVideoBtn').style.display = 'block';
-                        isProcessing = false;
-                        return;
-                    }
+                        document.getElementById('cancelVideoBtn').style.display = 'none';
+                        resolve(processedVideoBlob);
+                    };
 
-                    const time = currentFrame / fps;
-                    videoSource.currentTime = time;
+                    mediaRecorder.start();
 
-                    // Wait for frame to load
-                    const seekHandler = () => {
+                    // Reset video to start
+                    videoSource.currentTime = 0;
+
+                    const fps = 30;
+                    const totalFrames = Math.ceil(videoSource.duration * fps);
+                    let currentFrame = 0;
+                    let prevFrameData = null;
+                    let processingStrokeList = [];
+                    let seekPending = false;
+
+                    const processNextFrame = () => {
+                        if (processingCancelled) {
+                            mediaRecorder.stop();
+                            return;
+                        }
+
+                        if (currentFrame >= totalFrames) {
+                            mediaRecorder.stop();
+                            return;
+                        }
+
+                        const time = (currentFrame / fps);
+                        videoSource.currentTime = time;
+                        seekPending = true;
+                    };
+
+                    const onVideoSeeked = () => {
+                        if (!seekPending) return;
+                        seekPending = false;
+
                         try {
                             // Draw video frame
                             ctx.drawImage(videoSource, 0, 0);
@@ -784,17 +797,17 @@
                             sampleCtx.drawImage(videoSource, 0, 0, 96, 54);
                             const frame = sampleCtx.getImageData(0, 0, 96, 54);
 
-                            // Apply effects
-                            const { glowColor } = getThemeColors();
+                            // Apply fade effect
                             if (theme === 'paper') {
-                                ctx.fillStyle = 'rgba(240, 235, 220, 0.1)';
+                                ctx.fillStyle = 'rgba(240, 235, 220, 0.05)';
                             } else if (theme === 'aurora') {
-                                ctx.fillStyle = 'rgba(20, 20, 40, 0.1)';
+                                ctx.fillStyle = 'rgba(20, 20, 40, 0.05)';
                             } else {
-                                ctx.fillStyle = 'rgba(10, 10, 20, 0.1)';
+                                ctx.fillStyle = 'rgba(10, 10, 20, 0.05)';
                             }
                             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+                            // Analyze and generate strokes
                             if (prevFrameData) {
                                 const newStrokes = analyzeAndSpawn(frame, 96, 54);
                                 processingStrokeList = processingStrokeList.concat(newStrokes).filter(s => s.isAlive());
@@ -814,7 +827,6 @@
                                 ctx.globalCompositeOperation = 'lighter';
                             }
                             ctx.scale(scaleX, scaleY);
-
                             processingStrokeList.forEach(stroke => stroke.draw(ctx));
                             ctx.restore();
 
@@ -824,20 +836,25 @@
                             document.getElementById('progressFill').style.width = progress + '%';
                             document.getElementById('progressText').textContent = `${currentFrame} / ${totalFrames} frames (${Math.round(progress)}%)`;
 
-                            videoSource.removeEventListener('seeked', seekHandler);
-
-                            // Next frame
-                            requestAnimationFrame(processFrame);
+                            // Schedule next frame
+                            setTimeout(processNextFrame, 10);
                         } catch (err) {
-                            console.error('Frame processing error:', err);
-                            requestAnimationFrame(processFrame);
+                            console.error('Processing error:', err);
+                            setTimeout(processNextFrame, 10);
                         }
                     };
 
-                    videoSource.addEventListener('seeked', seekHandler, { once: true });
+                    videoSource.addEventListener('seeked', onVideoSeeked);
+
+                    // Start processing
+                    processNextFrame();
                 };
 
-                processFrame();
+                if (videoSource.readyState >= 1) {
+                    startProcessing();
+                } else {
+                    videoSource.addEventListener('loadedmetadata', startProcessing, { once: true });
+                }
             });
         }
 
@@ -915,25 +932,28 @@
         });
 
         document.getElementById('processVideoBtn').addEventListener('click', async () => {
-            await processVideo();
-            if (processedVideoBlob) {
-                downloadVideo(processedVideoBlob);
-                processedVideoBlob = null;
-                document.getElementById('downloadVideoBtn').style.display = 'none';
-                document.getElementById('processVideoBtn').style.display = 'block';
+            const blob = await processVideo();
+            if (blob && !processingCancelled) {
+                console.log('Video processing complete, blob size:', blob.size);
             }
         });
 
         document.getElementById('cancelVideoBtn').addEventListener('click', () => {
             processingCancelled = true;
+            document.getElementById('progressContainer').classList.remove('active');
+            document.getElementById('processVideoBtn').style.display = 'block';
+            document.getElementById('cancelVideoBtn').style.display = 'none';
         });
 
         document.getElementById('downloadVideoBtn').addEventListener('click', () => {
             if (processedVideoBlob) {
+                console.log('Downloading video, size:', processedVideoBlob.size);
                 downloadVideo(processedVideoBlob);
                 processedVideoBlob = null;
                 document.getElementById('downloadVideoBtn').style.display = 'none';
                 document.getElementById('processVideoBtn').style.display = 'block';
+            } else {
+                alert('沒有處理過的影片可下載');
             }
         });
 
