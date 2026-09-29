@@ -565,7 +565,23 @@
                 const ctx = canvas.getContext('2d');
 
                 const stream = canvas.captureStream(30);
-                const mimeType = 'video/mp4';
+
+                // 檢測支援的 MIME 類型
+                let mimeType = 'video/webm';
+                const types = [
+                    'video/webm;codecs=vp9',
+                    'video/webm;codecs=vp8',
+                    'video/webm',
+                    'video/mp4'
+                ];
+
+                for (let type of types) {
+                    if (MediaRecorder.isTypeSupported(type)) {
+                        mimeType = type;
+                        break;
+                    }
+                }
+
                 const recorder = new MediaRecorder(stream, {
                     mimeType,
                     videoBitsPerSecond: 5000000
@@ -604,8 +620,8 @@
                     }
 
                     // 循環選擇圖片
-                    const imgIndex = currentFrame % (params.duration * fps) % images.length;
-                    const currentImage = images[Math.floor(imgIndex * images.length / (params.duration * fps))];
+                    const imgIndex = Math.floor((currentFrame / totalFrames) * images.length) % images.length;
+                    const currentImage = images[imgIndex];
 
                     ctx.drawImage(currentImage, 0, 0);
 
@@ -673,7 +689,9 @@
                 const url = URL.createObjectURL(processedBlob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `ink-light-${Date.now()}.mp4`;
+                // 根據 blob 類型決定副檔名
+                const ext = processedBlob.type.includes('webm') ? 'webm' : 'mp4';
+                a.download = `ink-light-${Date.now()}.${ext}`;
                 a.click();
                 URL.revokeObjectURL(url);
                 showMessage('✓ 下載開始');
