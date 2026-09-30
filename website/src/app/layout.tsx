@@ -5,9 +5,24 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://www.gentleyehdesign.com"),
   title: "Gentleyehstudio — Hire an agent. Keep your brand.",
   description:
     "AI 品牌安全視覺代理：Logo 修正、去 AI 味、放大印刷。從 AI 草稿到品牌可以放心使用的作品。",
+  openGraph: {
+    title: "Gentleyehstudio — Hire an agent. Keep your brand.",
+    description:
+      "AI 品牌安全視覺代理：Logo 修正、去 AI 味、放大印刷。從 AI 草稿到品牌可以放心使用的作品。",
+    siteName: "Gentleyehstudio",
+    locale: "zh_TW",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Gentleyehstudio — Hire an agent. Keep your brand.",
+    description:
+      "AI 品牌安全視覺代理：Logo 修正、去 AI 味、放大印刷。從 AI 草稿到品牌可以放心使用的作品。",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
