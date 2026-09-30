@@ -230,7 +230,7 @@ export function HeroCanvas() {
   };
 
   return (
-    <div className="relative w-full h-full">
+    <div className="absolute inset-0 w-full h-full">
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
       <button
         onClick={togglePause}
