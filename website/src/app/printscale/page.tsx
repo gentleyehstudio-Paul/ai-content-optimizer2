@@ -107,7 +107,7 @@ export default function PrintScalePage() {
           <div className="mt-12">
             <BeforeAfter
               beforeSrc="/assets/idcard-before.jpg"
-              afterSrc="/assets/idcard-after.jpg"
+              afterSrc="/assets/upscale-after-hd.webp"
               beforeLabel="72 DPI"
               afterLabel="300 DPI"
               ratio="16/9"
