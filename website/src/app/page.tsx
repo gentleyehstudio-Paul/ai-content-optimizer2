@@ -231,9 +231,8 @@ export default function HomePage() {
                   "linear-gradient(100deg,#000 35%,rgba(0,0,0,.45) 100%)",
               }}
             >
-              Keep your brand
+              Keep your brand<span style={{ color: "#ffffff" }}>.</span>
             </span>
-            <span style={{ color: "#ffffff" }}>.</span>
           </h1>
 
           <div
@@ -419,9 +418,13 @@ export default function HomePage() {
                 Lulu · LogoLock
               </span>
             </figcaption>
-            <BeforeAfter variant="logo" ratio="4/3" />
+            <BeforeAfter
+              beforeSrc="/assets/logo-before.jpg"
+              afterSrc="/assets/logo-after.jpg"
+              ratio="4/3"
+            />
             <p style={{ margin: 0, fontSize: 11, color: "#7a8077" }}>
-              示意畫面 — 正式上線前替換為授權案例圖
+              Rotary District 3521 — Logo 修正前後對比
             </p>
           </figure>
 
