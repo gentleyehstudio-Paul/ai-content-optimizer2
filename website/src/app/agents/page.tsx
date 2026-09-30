@@ -111,7 +111,8 @@ export default function AgentsPage() {
           </p>
           <a
             href="#diagnose"
-            className="inline-flex items-center gap-2 mt-8 px-8 py-3.5 bg-ink text-white font-semibold text-[15px] rounded-full hover:bg-red transition-colors"
+            className="inline-flex items-center gap-2 mt-8 px-8 py-3.5 bg-ink font-semibold text-[15px] rounded-full hover:bg-red transition-colors"
+            style={{ color: "#ffffff" }}
           >
             上傳你的 AI 圖，免費診斷
           </a>

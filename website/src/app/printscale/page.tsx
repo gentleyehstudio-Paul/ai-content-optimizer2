@@ -98,15 +98,16 @@ export default function PrintScalePage() {
           </p>
           <a
             href="#trial"
-            className="inline-flex items-center gap-2 mt-8 px-8 py-3.5 bg-ink text-white font-semibold text-[15px] rounded-full hover:bg-red transition-colors"
+            className="inline-flex items-center gap-2 mt-8 px-8 py-3.5 bg-ink font-semibold text-[15px] rounded-full hover:bg-red transition-colors"
+            style={{ color: "#ffffff" }}
           >
             免費試用 3 張
           </a>
 
           <div className="mt-12">
             <BeforeAfter
-              beforeSrc="/assets/upscale-before.jpg"
-              afterSrc="/assets/upscale-after.jpg"
+              beforeSrc="/assets/idcard-before.jpg"
+              afterSrc="/assets/idcard-after.jpg"
               beforeLabel="72 DPI"
               afterLabel="300 DPI"
               ratio="16/9"

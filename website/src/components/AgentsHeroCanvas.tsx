@@ -395,24 +395,24 @@ export function AgentsHeroCanvas() {
       const zt = zr.top - hr.top;
       const zh = Math.max(zr.height, 220);
       if (m) {
-        const lw = Math.min(w * 0.5, zh * 0.88);
-        const mw = Math.min(w * 0.44, zh * 0.8);
+        const lw = Math.min(w * 0.42, zh * 0.7);
+        const mw = Math.min(w * 0.38, zh * 0.65);
         L.m = true;
-        L.cx = w * 0.5;
+        L.cx = w * 0.65;
         L.cy = h * 0.5;
-        L.R = w * 0.39;
-        place(lulu, w * 0.5 - lw * 0.98, zt + zh * 0.02, lw);
-        place(miles, w * 0.5 + lw * 0.02, zt + zh * 0.14, mw);
+        L.R = w * 0.32;
+        place(lulu, w * 0.38, zt + zh * 0.08, lw);
+        place(miles, w * 0.58, zt + zh * 0.2, mw);
         tl.style.display = tm.style.display = "none";
       } else {
         const s = Math.min(zh * 0.98, w * 0.2, 400);
         const ly = zt + (zh - s) / 2;
-        const lx = w * 0.5 - s * 1.02;
-        const mx0 = w * 0.5 + s * 0.02;
+        const lx = w * 0.58;
+        const mx0 = lx + s * 0.6;
         L.m = false;
-        L.cx = w * 0.5;
+        L.cx = w * 0.65;
         L.cy = h * 0.5;
-        L.R = Math.min(w * 0.25, h * 0.42);
+        L.R = Math.min(w * 0.22, h * 0.38);
         place(lulu, lx, ly, s);
         place(miles, mx0, ly + s * 0.06, s * 0.92);
         tl.style.display = tm.style.display = "block";
