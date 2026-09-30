@@ -173,12 +173,12 @@ export default function HomePage() {
           color: "#f4f4f1",
           display: "flex",
           flexDirection: "column",
-          padding: "clamp(36px,7vh,80px) clamp(20px,4.5vw,72px) 0",
+          paddingTop: "clamp(36px,7vh,80px)",
         }}
       >
         <HeroCanvas />
 
-        <div style={{ position: "relative", zIndex: 3, pointerEvents: "none" }}>
+        <div className="relative z-[3] max-w-[1280px] mx-auto px-5 w-full flex flex-col" style={{ flex: "1 1 auto", pointerEvents: "none" }}>
           <div
             style={{
               display: "flex",
@@ -242,112 +242,112 @@ export default function HomePage() {
               borderTop: "1px dotted #77776f",
             }}
           />
-        </div>
 
-        <div
-          style={{
-            flex: "1 1 auto",
-            minHeight: "clamp(300px,36vh,420px)",
-          }}
-        />
-
-        <div
-          style={{
-            position: "relative",
-            zIndex: 4,
-            display: "flex",
-            flexWrap: "wrap",
-            justifyContent: "space-between",
-            alignItems: "flex-end",
-            gap: 24,
-            paddingBottom: 28,
-          }}
-        >
-          <div style={{ maxWidth: 430 }}>
-            <p
-              style={{
-                margin: "0 0 22px",
-                fontSize: 15,
-                lineHeight: 1.75,
-                color: "#d2d2cc",
-                textShadow: "0 1px 14px rgba(0,0,0,.9)",
-              }}
-            >
-              從 AI 草稿，到品牌可以放心使用的作品
-              <br />
-              每張產出，都由設計師把關
-            </p>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 24,
-                flexWrap: "wrap",
-              }}
-            >
-              <a
-                href="#results"
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 28,
-                  minHeight: 52,
-                  background: "#ffffff",
-                  color: "#050505",
-                  padding: "0 22px",
-                  borderRadius: 3,
-                  fontSize: 14,
-                  fontWeight: 600,
-                }}
-              >
-                上傳你的 AI 圖，免費診斷
-                <span aria-hidden>↗</span>
-              </a>
-              <a
-                href="#results"
-                style={{
-                  fontSize: 13,
-                  color: "#ffffff",
-                  borderBottom: "1px solid #77776f",
-                  padding: "6px 0 4px",
-                }}
-              >
-                看案例
-              </a>
-            </div>
-          </div>
+          <div
+            style={{
+              flex: "1 1 auto",
+              minHeight: "clamp(300px,36vh,420px)",
+            }}
+          />
 
           <div
             style={{
               display: "flex",
-              alignItems: "center",
-              gap: 14,
-              fontSize: 9,
-              letterSpacing: 1.6,
-              color: "#9a9a93",
+              flexWrap: "wrap",
+              justifyContent: "space-between",
+              alignItems: "flex-end",
+              gap: 24,
+              paddingBottom: 28,
+              pointerEvents: "auto",
             }}
           >
-            <button
-              type="button"
-              aria-label="Pause animation"
+            <div style={{ maxWidth: 430 }}>
+              <p
+                style={{
+                  margin: "0 0 22px",
+                  fontSize: 15,
+                  lineHeight: 1.75,
+                  color: "#d2d2cc",
+                  textShadow: "0 1px 14px rgba(0,0,0,.9)",
+                }}
+              >
+                從 AI 草稿，到品牌可以放心使用的作品
+                <br />
+                每張產出，都由設計師把關
+              </p>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 24,
+                  flexWrap: "wrap",
+                }}
+              >
+                <a
+                  href="#results"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 28,
+                    minHeight: 52,
+                    background: "#ffffff",
+                    color: "#050505",
+                    padding: "0 22px",
+                    borderRadius: 3,
+                    fontSize: 14,
+                    fontWeight: 600,
+                  }}
+                >
+                  上傳你的 AI 圖，免費診斷
+                  <span aria-hidden>↗</span>
+                </a>
+                <a
+                  href="#results"
+                  style={{
+                    fontSize: 13,
+                    color: "#ffffff",
+                    borderBottom: "1px solid #77776f",
+                    padding: "6px 0 4px",
+                  }}
+                >
+                  看案例
+                </a>
+              </div>
+            </div>
+
+            <div
               style={{
-                width: 32,
-                height: 32,
-                borderRadius: "50%",
-                border: "1px solid rgba(255,255,255,.3)",
-                background: "transparent",
-                color: "#f4f4f1",
-                fontSize: 10,
-                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 14,
+                fontSize: 9,
+                letterSpacing: 1.6,
+                color: "#9a9a93",
               }}
             >
-              ❚❚
-            </button>
-            <span>DATA → INK → RIVER</span>
+              <button
+                type="button"
+                aria-label="Pause animation"
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: "50%",
+                  border: "1px solid rgba(255,255,255,.3)",
+                  background: "transparent",
+                  color: "#f4f4f1",
+                  fontSize: 10,
+                  cursor: "pointer",
+                }}
+              >
+                ❚❚
+              </button>
+              <span>DATA → INK → RIVER</span>
+            </div>
           </div>
         </div>
 
         <div
+          className="max-w-[1280px] mx-auto px-5 w-full"
           style={{
             position: "relative",
             zIndex: 4,
