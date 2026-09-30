@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { BeforeAfter } from "@/components/BeforeAfter";
+import { AgentsHeroCanvas } from "@/components/AgentsHeroCanvas";
 
 const SCENARIOS = [
   { num: "01", text: "Logo 的字母被 AI 改寫、拉長、少一筆" },
@@ -83,71 +84,37 @@ export default function AgentsPage() {
       <section
         className="relative bg-paper-alt overflow-hidden"
         style={{
-          paddingTop: "clamp(120px, 14vw, 200px)",
-          paddingBottom: "clamp(72px, 9vw, 128px)",
+          minHeight: "clamp(520px, 80vh, 900px)",
         }}
       >
-        <div className="max-w-[1280px] mx-auto px-5">
-          <div className="flex flex-col lg:flex-row items-start gap-12">
-            <div className="flex-1">
-              <p className="text-[11px] tracking-[.16em] uppercase font-medium text-text-secondary mb-6">
-                INK / GLASS / HUMAN TOUCH
-              </p>
-              <div className="flex gap-6 mb-8">
-                <div className="text-[11px] text-text-secondary">
-                  <span className="text-red font-bold">01</span> / LULU
-                  <br />
-                  <span className="font-semibold text-ink">
-                    BRAND, PRESERVED.
-                  </span>
-                </div>
-                <div className="text-[11px] text-text-secondary">
-                  <span className="text-red font-bold">02</span> / MILES
-                  <br />
-                  <span className="font-semibold text-ink">READY TO GO.</span>
-                </div>
-              </div>
-              <h1
-                className="font-bold text-ink"
-                style={{
-                  fontSize: "clamp(38px, 8.7vw, 120px)",
-                  lineHeight: 0.94,
-                  letterSpacing: "-.025em",
-                }}
-              >
-                Hire an agent
-                <br />
-                <span className="font-extralight">Keep your brand.</span>
-              </h1>
-              <p className="text-text-secondary text-[15px] mt-6 max-w-md leading-relaxed">
-                從 AI 草稿，到品牌可以放心使用的作品
-                <br />
-                每張產出，都由設計師把關
-              </p>
-              <a
-                href="#diagnose"
-                className="inline-flex items-center gap-2 mt-8 px-8 py-3.5 bg-ink text-white font-semibold text-[15px] rounded-full hover:bg-red transition-colors"
-              >
-                上傳你的 AI 圖，免費診斷
-              </a>
-            </div>
-            <div className="flex gap-6 lg:mt-12">
-              <Image
-                src="/assets/lulu.png"
-                alt="Lulu"
-                width={160}
-                height={160}
-                className="rounded-2xl"
-              />
-              <Image
-                src="/assets/miles.png"
-                alt="Miles"
-                width={160}
-                height={160}
-                className="rounded-2xl"
-              />
-            </div>
-          </div>
+        <AgentsHeroCanvas />
+        <div className="relative z-10 max-w-[1280px] mx-auto px-5" style={{ paddingTop: "clamp(120px, 14vw, 200px)", paddingBottom: "clamp(72px, 9vw, 128px)" }}>
+          <p className="text-[11px] tracking-[.16em] uppercase font-medium text-text-secondary mb-6">
+            INK / GLASS / HUMAN TOUCH
+          </p>
+          <h1
+            className="font-bold text-ink"
+            style={{
+              fontSize: "clamp(38px, 8.7vw, 120px)",
+              lineHeight: 0.94,
+              letterSpacing: "-.025em",
+            }}
+          >
+            Hire an agent
+            <br />
+            <span className="font-extralight">Keep your brand.</span>
+          </h1>
+          <p className="text-text-secondary text-[15px] mt-6 max-w-md leading-relaxed">
+            從 AI 草稿，到品牌可以放心使用的作品
+            <br />
+            每張產出，都由設計師把關
+          </p>
+          <a
+            href="#diagnose"
+            className="inline-flex items-center gap-2 mt-8 px-8 py-3.5 bg-ink text-white font-semibold text-[15px] rounded-full hover:bg-red transition-colors"
+          >
+            上傳你的 AI 圖，免費診斷
+          </a>
         </div>
       </section>
 
@@ -272,14 +239,14 @@ export default function AgentsPage() {
               </p>
               <div className="grid grid-cols-2 gap-3 mb-6">
                 <Image
-                  src="/assets/idcard-before.jpg"
+                  src="/assets/upscale-before.jpg"
                   alt="Before"
                   width={300}
                   height={200}
                   className="rounded-lg w-full object-cover"
                 />
                 <Image
-                  src="/assets/idcard-after.jpg"
+                  src="/assets/upscale-after.jpg"
                   alt="After"
                   width={300}
                   height={200}

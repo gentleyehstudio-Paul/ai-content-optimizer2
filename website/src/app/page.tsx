@@ -465,8 +465,8 @@ export default function HomePage() {
               </span>
             </figcaption>
             <BeforeAfter
-              beforeSrc="/assets/upscale-before.jpg"
-              afterSrc="/assets/upscale-after.jpg"
+              beforeSrc="/assets/idcard-before.jpg"
+              afterSrc="/assets/idcard-after.jpg"
               ratio="4/3"
             />
           </figure>
