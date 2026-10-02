@@ -33,3 +33,71 @@ a {
 a:hover {
   color: #a63328;
 }
+
+.prose-article h2 {
+  font-size: clamp(20px, 2.4vw, 28px);
+  font-weight: 700;
+  color: #191a18;
+  margin-top: 2.5em;
+  margin-bottom: 0.6em;
+  line-height: 1.25;
+}
+.prose-article h3 {
+  font-size: 17px;
+  font-weight: 700;
+  color: #191a18;
+  margin-top: 2em;
+  margin-bottom: 0.5em;
+}
+.prose-article p {
+  font-size: 15px;
+  line-height: 1.8;
+  color: #5d645b;
+  margin-bottom: 1.2em;
+}
+.prose-article ul,
+.prose-article ol {
+  font-size: 15px;
+  line-height: 1.8;
+  color: #5d645b;
+  margin-bottom: 1.2em;
+  padding-left: 1.5em;
+}
+.prose-article li {
+  margin-bottom: 0.4em;
+}
+.prose-article strong {
+  color: #191a18;
+  font-weight: 600;
+}
+.prose-article hr {
+  border: none;
+  border-top: 1px solid #d8d9d1;
+  margin: 2em 0;
+}
+.prose-article table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  margin-bottom: 1.5em;
+}
+.prose-article th {
+  text-align: left;
+  font-weight: 600;
+  color: #191a18;
+  padding: 10px 12px;
+  border-bottom: 2px solid #d8d9d1;
+  font-size: 13px;
+}
+.prose-article td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #d8d9d1;
+  color: #5d645b;
+}
+.prose-article blockquote {
+  border-left: 3px solid #a63328;
+  padding-left: 1em;
+  margin: 1.5em 0;
+  color: #4e554e;
+  font-size: 15px;
+}

@@ -70,6 +70,14 @@ export function Footer() {
                   企業培訓
                 </Link>
               </li>
+              <li>
+                <Link
+                  href="/resources"
+                  className="text-[14px] text-ink hover:text-red"
+                >
+                  資源
+                </Link>
+              </li>
             </ul>
           </div>
 
