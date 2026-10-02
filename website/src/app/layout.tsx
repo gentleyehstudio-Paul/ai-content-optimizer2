@@ -41,6 +41,37 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <Header />
         <main className="flex-1">{children}</main>
         <Footer />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "Organization",
+              name: "Gentleyehstudio",
+              legalName: "居葉國際文化有限公司",
+              url: "https://www.gentleyehdesign.com",
+              description:
+                "AI 品牌安全視覺代理與企業培訓：Logo 修正、去 AI 味、放大印刷、AI 視覺應用課程",
+              founder: {
+                "@type": "Person",
+                name: "葉致綱",
+                alternateName: "Paul Yeh",
+                jobTitle: "品牌設計師 · AI 應用規劃師",
+              },
+              knowsAbout: [
+                "AI 圖片生成",
+                "品牌設計",
+                "AI 企業培訓",
+                "中小企業 AI 數位轉型",
+                "印刷輸出",
+              ],
+              areaServed: { "@type": "Country", name: "TW" },
+              sameAs: [
+                "https://www.linkedin.com/in/paul-yeh-82a185154/",
+              ],
+            }),
+          }}
+        />
       </body>
     </html>
   );
