@@ -8,7 +8,9 @@
     "dev": "node --watch server.js",
     "db:init": "node db/run-init.js",
     "db:seed": "node db/run-seed.js",
-    "scrape": "node src/scraper/scheduler.js"
+    "scrape": "node src/scraper/scheduler.js",
+    "import:portaly": "node src/scraper/import-portaly.js",
+    "db:migrate": "node db/run-migrate.js"
   },
   "engines": {
     "node": ">=18.0.0"

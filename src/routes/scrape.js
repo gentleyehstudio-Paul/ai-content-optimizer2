@@ -1,6 +1,17 @@
 const express = require('express');
 const router = express.Router();
 const { scrapeAndStore } = require('../scraper/scheduler');
+const { importAll } = require('../scraper/import-portaly');
+
+router.post('/import-portaly', async (req, res) => {
+  try {
+    res.json({ success: true, message: 'Import started — check server logs for progress' });
+    importAll().catch(err => console.error('Portaly import error:', err));
+  } catch (err) {
+    console.error('Import API error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 router.post('/', async (req, res) => {
   const { url, category } = req.body;
