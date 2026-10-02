@@ -75,7 +75,7 @@ export function Footer() {
                   href="/resources"
                   className="text-[14px] text-ink hover:text-red"
                 >
-                  資源
+                  指南
                 </Link>
               </li>
             </ul>

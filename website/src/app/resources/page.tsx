@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "資源 — AI 品牌應用指南與教學 | Gentleyehstudio",
+  title: "指南 — AI 品牌應用指南與教學 | Gentleyehstudio",
   description:
-    "AI 圖片商用授權、品牌素材準備清單、AI 圖放大印刷教學。免費下載，中小企業 AI 數位轉型的實用資源。",
+    "AI 圖片商用授權、品牌素材準備清單、AI 圖放大印刷教學。免費閱讀，中小企業 AI 數位轉型的實用指南。",
 };
 
 const ARTICLES = [
@@ -44,7 +44,7 @@ export default function ResourcesPage() {
       >
         <div className="max-w-[880px] mx-auto px-5">
           <p className="text-[11px] tracking-[.16em] uppercase font-medium text-text-secondary mb-6">
-            RESOURCES
+            GUIDES
           </p>
           <h1
             className="font-bold text-ink"
@@ -54,7 +54,7 @@ export default function ResourcesPage() {
               letterSpacing: "-.025em",
             }}
           >
-            資源
+            指南
           </h1>
           <p className="text-text-secondary text-[16px] mt-4 max-w-lg leading-relaxed">
             AI 視覺應用的實用指南——授權、品牌素材、印刷輸出，免費閱讀

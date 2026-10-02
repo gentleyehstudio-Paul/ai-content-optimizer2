@@ -25,7 +25,7 @@ export function ArticleLayout({
             href="/resources"
             className="text-[13px] text-text-secondary hover:text-red transition-colors"
           >
-            ← 返回資源
+            ← 返回指南
           </Link>
 
           <div className="flex items-center gap-3 mt-8">

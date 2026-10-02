@@ -8,7 +8,7 @@ const NAV_ITEMS = [
   { label: "PrintScale-AI", href: "/printscale" },
   { label: "案例", href: "/case" },
   { label: "企業培訓", href: "/training" },
-  { label: "資源", href: "/resources" },
+  { label: "指南", href: "/resources" },
   { label: "關於", href: "/#about" },
 ];
 
