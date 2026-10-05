@@ -32,11 +32,86 @@
   </div>
 
   <div class="ys-container">
-    <div id="loading" class="ys-loading">載入中⋯</div>
-    <div id="grid" class="ys-grid" style="display:none"></div>
-    <div id="empty" class="ys-empty" style="display:none">
-      <p>目前尚無資料</p>
-      <a href="/" style="display:inline-block;margin-top:24px;font-size:13px;letter-spacing:.14em;color:var(--brown)">← 回首頁</a>
+    <div class="ys-category-layout">
+      <aside class="ys-sidebar" id="sidebar">
+        <button class="ys-sidebar-toggle" id="sidebar-toggle">
+          <span>篩選條件</span>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M4 8h8M6 12h4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        </button>
+
+        <div class="ys-sidebar-body" id="sidebar-body">
+          <div class="ys-filter-group">
+            <h3 class="ys-filter-title">地區</h3>
+            <select id="filter-region" class="ys-filter-select">
+              <option value="">全部地區</option>
+            </select>
+          </div>
+
+          <div class="ys-filter-group">
+            <h3 class="ys-filter-title">Portaly 分類</h3>
+            <select id="filter-portaly" class="ys-filter-select">
+              <option value="">全部分類</option>
+              <option value="A">A. 課程教學類</option>
+              <option value="B">B. 身體調理類</option>
+              <option value="C">C. 空間能量類</option>
+              <option value="D">D. 心靈茶飲類</option>
+              <option value="E">E. 商品販售類</option>
+              <option value="F">F. 個案諮詢類</option>
+              <option value="G">G. 頌缽療育類</option>
+              <option value="H">H. 瑜伽教室類</option>
+              <option value="I">I. 場地租借類</option>
+              <option value="J">J. 其他類</option>
+            </select>
+          </div>
+
+          <div class="ys-filter-group">
+            <h3 class="ys-filter-title">價格範圍</h3>
+            <div class="ys-filter-radios">
+              <label class="ys-filter-radio"><input type="radio" name="price" value="" checked><span>不限</span></label>
+              <label class="ys-filter-radio"><input type="radio" name="price" value="low"><span>$500 以下</span></label>
+              <label class="ys-filter-radio"><input type="radio" name="price" value="mid"><span>$500 – $2,000</span></label>
+              <label class="ys-filter-radio"><input type="radio" name="price" value="high"><span>$2,000 以上</span></label>
+            </div>
+          </div>
+
+          <div class="ys-filter-group" id="facilities-group" style="display:none">
+            <h3 class="ys-filter-title">場地設施</h3>
+            <div class="ys-filter-checks">
+              <label class="ys-filter-check"><input type="checkbox" data-facility="has_mirror"><span>鏡子</span></label>
+              <label class="ys-filter-check"><input type="checkbox" data-facility="has_wooden_floor"><span>木地板</span></label>
+              <label class="ys-filter-check"><input type="checkbox" data-facility="has_accessibility"><span>無障礙空間</span></label>
+              <label class="ys-filter-check"><input type="checkbox" data-facility="has_audio_equipment"><span>音響設備</span></label>
+              <label class="ys-filter-check"><input type="checkbox" data-facility="has_parking"><span>停車場</span></label>
+              <label class="ys-filter-check"><input type="checkbox" data-facility="has_shower"><span>淋浴間</span></label>
+              <label class="ys-filter-check"><input type="checkbox" data-facility="has_kitchen"><span>廚房</span></label>
+              <label class="ys-filter-check"><input type="checkbox" data-facility="has_wifi"><span>Wi-Fi</span></label>
+            </div>
+          </div>
+
+          <div class="ys-filter-group">
+            <h3 class="ys-filter-title">關鍵字搜尋</h3>
+            <input type="text" id="filter-keyword" class="ys-filter-input" placeholder="輸入名稱或描述⋯">
+          </div>
+
+          <div class="ys-filter-actions">
+            <button class="ys-filter-reset" id="filter-reset">清除篩選</button>
+            <span class="ys-filter-count" id="filter-count"></span>
+          </div>
+        </div>
+      </aside>
+
+      <main class="ys-main">
+        <div id="loading" class="ys-loading">載入中⋯</div>
+        <div id="grid" class="ys-grid" style="display:none"></div>
+        <div id="empty" class="ys-empty" style="display:none">
+          <p>目前尚無資料</p>
+          <a href="/" style="display:inline-block;margin-top:24px;font-size:13px;letter-spacing:.14em;color:var(--brown)">← 回首頁</a>
+        </div>
+        <div id="no-results" class="ys-empty" style="display:none">
+          <p>沒有符合篩選條件的結果</p>
+          <button id="clear-filters-btn" style="margin-top:16px;padding:8px 24px;border:1px solid var(--brown);background:none;color:var(--brown);font-family:var(--font-serif);font-size:13px;letter-spacing:.14em;cursor:pointer">清除篩選</button>
+        </div>
+      </main>
     </div>
   </div>
 
