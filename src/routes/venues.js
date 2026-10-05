@@ -6,5 +6,5 @@ module.exports = createResourceRouter('venues', [
   'region', 'price_info', 'line_at', 'portaly_category', 'booking_url',
   'has_mirror', 'has_wooden_floor', 'has_accessibility',
   'has_audio_equipment', 'has_parking', 'has_shower',
-  'has_kitchen', 'has_wifi', 'capacity'
+  'has_kitchen', 'has_wifi', 'has_projector', 'near_mrt', 'capacity'
 ]);
