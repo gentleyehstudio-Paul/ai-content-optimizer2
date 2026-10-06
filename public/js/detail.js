@@ -1,8 +1,8 @@
 const CATEGORIES = {
-  venues: { zh: '場地', en: 'VENUE', label: '場地', descKey: 'description', metaFields: ['location', 'address'] },
-  facilitators: { zh: '師資', en: 'FACILITATOR', label: '師資', descKey: 'bio', metaFields: ['title'] },
-  herbals: { zh: '草本', en: 'HERBAL', label: '草本', descKey: 'description', metaFields: ['origin'] },
-  ingredients: { zh: '食材', en: 'INGREDIENT', label: '食材', descKey: 'description', metaFields: ['origin', 'season'] },
+  venues: { zh: '場地', en: 'VENUE', label: '場地', descKey: 'description', metaFields: ['location', 'address'], defaultImg: '/assets/images/venue-zen.jpg' },
+  facilitators: { zh: '師資', en: 'FACILITATOR', label: '師資', descKey: 'bio', metaFields: ['title'], defaultImg: '/assets/images/facilitator-ceremony.jpg' },
+  herbals: { zh: '草本', en: 'HERBAL', label: '草本', descKey: 'description', metaFields: ['origin'], defaultImg: '/assets/images/herbal-bowls.jpg' },
+  ingredients: { zh: '食材', en: 'INGREDIENT', label: '食材', descKey: 'description', metaFields: ['origin', 'season'], defaultImg: '/assets/images/ingredient-harvest.jpg' },
 };
 
 const META_LABELS = {
@@ -115,7 +115,7 @@ async function load() {
     document.getElementById('detail-desc').textContent = item[cat.descKey] || item.description || item.bio || '';
 
     const img = document.getElementById('hero-img');
-    img.src = item.image_url || '/assets/images/venue-teahouse.jpg';
+    img.src = item.image_url || cat.defaultImg;
     img.alt = item.name;
 
     const metaContainer = document.getElementById('detail-meta');

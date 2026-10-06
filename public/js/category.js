@@ -1,8 +1,8 @@
 const CATEGORIES = {
-  venues: { zh: '場地', en: 'VENUE', label: '01 — 場地', subtitle: 'Healing spaces across the island', descKey: 'description', secondaryKey: 'location' },
-  facilitators: { zh: '師資', en: 'FACILITATOR', label: '02 — 師資', subtitle: 'Guides for body and mind', descKey: 'bio', secondaryKey: 'title' },
-  herbals: { zh: '草本', en: 'HERBAL', label: '03 — 草本', subtitle: 'Herbs and botanicals of Taiwan', descKey: 'description', secondaryKey: 'origin' },
-  ingredients: { zh: '食材', en: 'INGREDIENT', label: '04 — 食材', subtitle: 'Farm-to-table healing ingredients', descKey: 'description', secondaryKey: 'origin' },
+  venues: { zh: '場地', en: 'VENUE', label: '01 — 場地', subtitle: 'Healing spaces across the island', descKey: 'description', secondaryKey: 'location', hero: '/assets/images/venue-pool.jpg', defaultImg: '/assets/images/venue-zen.jpg' },
+  facilitators: { zh: '師資', en: 'FACILITATOR', label: '02 — 師資', subtitle: 'Guides for body and mind', descKey: 'bio', secondaryKey: 'title', hero: '/assets/images/facilitator-meditation.jpg', defaultImg: '/assets/images/facilitator-ceremony.jpg' },
+  herbals: { zh: '草本', en: 'HERBAL', label: '03 — 草本', subtitle: 'Herbs and botanicals of Taiwan', descKey: 'description', secondaryKey: 'origin', hero: '/assets/images/herbal-stone.jpg', defaultImg: '/assets/images/herbal-bowls.jpg' },
+  ingredients: { zh: '食材', en: 'INGREDIENT', label: '04 — 食材', subtitle: 'Farm-to-table healing ingredients', descKey: 'description', secondaryKey: 'origin', hero: '/assets/images/ingredient-harvest.jpg', defaultImg: '/assets/images/herbal-bowls.jpg' },
 };
 
 const path = window.location.pathname;
@@ -13,6 +13,8 @@ document.title = `${cat.zh} — 有鬆島`;
 document.getElementById('section-label').textContent = cat.label;
 document.getElementById('page-title').textContent = `探索${cat.zh}`;
 document.getElementById('page-subtitle').textContent = cat.subtitle;
+document.getElementById('page-hero-img').src = cat.hero;
+document.getElementById('page-hero-img').alt = cat.zh;
 
 if (type === 'venues') {
   document.getElementById('facilities-group').style.display = '';
@@ -108,7 +110,7 @@ function renderGrid(items) {
 
     const desc = item[cat.descKey] || item.description || '';
     const secondary = item[cat.secondaryKey] || '';
-    const imgSrc = item.image_url || '/assets/images/venue-teahouse.jpg';
+    const imgSrc = item.image_url || cat.defaultImg;
 
     const badges = [];
     if (item.region) badges.push(item.region);
