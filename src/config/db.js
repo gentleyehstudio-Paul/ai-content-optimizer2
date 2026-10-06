@@ -3,7 +3,9 @@ const isNeon = process.env.DATABASE_URL?.includes('neon.tech');
 let pool;
 
 if (isNeon) {
-  const { Pool } = require('@neondatabase/serverless');
+  const { Pool, neonConfig } = require('@neondatabase/serverless');
+  const ws = require('ws');
+  neonConfig.webSocketConstructor = ws;
   pool = new Pool({ connectionString: process.env.DATABASE_URL });
 } else {
   const { Pool } = require('pg');

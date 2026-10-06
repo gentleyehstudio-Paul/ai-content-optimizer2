@@ -181,7 +181,9 @@ function bindEvents() {
 async function load() {
   try {
     const res = await fetch(`/api/${type}`);
-    allItems = await res.json();
+    const data = await res.json();
+    if (!Array.isArray(data)) throw new Error(data.error || 'Invalid response');
+    allItems = data;
     document.getElementById('loading').style.display = 'none';
 
     populateRegionDropdown(allItems);
