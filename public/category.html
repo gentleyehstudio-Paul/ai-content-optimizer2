@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>有鬆島</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;400;500&family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=Noto+Serif+TC:wght@300;400;500;600&family=Poppins:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="ys-header" style="background:var(--dark)">
+    <a href="/" class="ys-logo">
+      <span class="ys-logo-zh">有鬆島</span>
+      <span class="ys-logo-en">YOUSONG</span>
+    </a>
+    <nav class="ys-nav">
+      <a href="/#island">島嶼</a>
+      <a href="/#dimensions">四維</a>
+      <a href="/#rhythm">節氣</a>
+      <a href="/#join">共創</a>
+    </nav>
+  </header>
+
+  <div class="ys-page-header ys-page-header--hero">
+    <img id="page-hero-img" class="ys-page-header-img" src="" alt="">
+    <div class="ys-page-header-overlay"></div>
+    <div class="ys-container" style="position:relative;z-index:1">
+      <span class="ys-section-label" style="color:rgba(244,241,234,.55)" id="section-label"></span>
+      <h1 id="page-title" style="margin-top:16px"></h1>
+      <p id="page-subtitle"></p>
+    </div>
+  </div>
+
+  <div class="ys-container">
+    <div class="ys-category-layout">
+      <aside class="ys-sidebar" id="sidebar">
+        <button class="ys-sidebar-toggle" id="sidebar-toggle">
+          <span>篩選條件</span>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M4 8h8M6 12h4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        </button>
+
+        <div class="ys-sidebar-body" id="sidebar-body">
+          <div class="ys-filter-group">
+            <h3 class="ys-filter-title">地區</h3>
+            <select id="filter-region" class="ys-filter-select">
+              <option value="">全部地區</option>
+            </select>
+          </div>
+
+          <div class="ys-filter-group">
+            <h3 class="ys-filter-title">Portaly 分類</h3>
+            <select id="filter-portaly" class="ys-filter-select">
+              <option value="">全部分類</option>
+              <option value="A">A. 課程教學類</option>
+              <option value="B">B. 身體調理類</option>
+              <option value="C">C. 空間能量類</option>
+              <option value="D">D. 心靈茶飲類</option>
+              <option value="E">E. 商品販售類</option>
+              <option value="F">F. 個案諮詢類</option>
+              <option value="G">G. 頌缽療育類</option>
+              <option value="H">H. 瑜伽教室類</option>
+              <option value="I">I. 場地租借類</option>
+              <option value="J">J. 其他類</option>
+            </select>
+          </div>
+
+          <div class="ys-filter-group">
+            <h3 class="ys-filter-title">價格範圍</h3>
+            <div class="ys-filter-radios">
+              <label class="ys-filter-radio"><input type="radio" name="price" value="" checked><span>不限</span></label>
+              <label class="ys-filter-radio"><input type="radio" name="price" value="low"><span>$500 以下</span></label>
+              <label class="ys-filter-radio"><input type="radio" name="price" value="mid"><span>$500 – $2,000</span></label>
+              <label class="ys-filter-radio"><input type="radio" name="price" value="high"><span>$2,000 以上</span></label>
+            </div>
+          </div>
+
+          <div class="ys-filter-group" id="facilities-group" style="display:none">
+            <h3 class="ys-filter-title">場地設施</h3>
+            <div class="ys-filter-checks">
+              <label class="ys-filter-check"><input type="checkbox" data-facility="has_mirror"><span>鏡子</span></label>
+              <label class="ys-filter-check"><input type="checkbox" data-facility="has_wooden_floor"><span>木地板</span></label>
+              <label class="ys-filter-check"><input type="checkbox" data-facility="has_accessibility"><span>無障礙空間</span></label>
+              <label class="ys-filter-check"><input type="checkbox" data-facility="has_audio_equipment"><span>音響設備</span></label>
+              <label class="ys-filter-check"><input type="checkbox" data-facility="has_parking"><span>停車場</span></label>
+              <label class="ys-filter-check"><input type="checkbox" data-facility="has_shower"><span>淋浴間</span></label>
+              <label class="ys-filter-check"><input type="checkbox" data-facility="has_kitchen"><span>廚房</span></label>
+              <label class="ys-filter-check"><input type="checkbox" data-facility="has_wifi"><span>Wi-Fi</span></label>
+              <label class="ys-filter-check"><input type="checkbox" data-facility="has_projector"><span>投影機</span></label>
+              <label class="ys-filter-check"><input type="checkbox" data-facility="near_mrt"><span>捷運站步行5分鐘內</span></label>
+            </div>
+          </div>
+
+          <div class="ys-filter-group">
+            <h3 class="ys-filter-title">關鍵字搜尋</h3>
+            <input type="text" id="filter-keyword" class="ys-filter-input" placeholder="輸入名稱或描述⋯">
+          </div>
+
+          <div class="ys-filter-actions">
+            <button class="ys-filter-reset" id="filter-reset">清除篩選</button>
+            <span class="ys-filter-count" id="filter-count"></span>
+          </div>
+        </div>
+      </aside>
+
+      <main class="ys-main">
+        <div id="loading" class="ys-loading">載入中⋯</div>
+        <div id="grid" class="ys-grid" style="display:none"></div>
+        <div id="empty" class="ys-empty" style="display:none">
+          <p>目前尚無資料</p>
+          <a href="/" style="display:inline-block;margin-top:24px;font-size:13px;letter-spacing:.14em;color:var(--brown)">← 回首頁</a>
+        </div>
+        <div id="no-results" class="ys-empty" style="display:none">
+          <p>沒有符合篩選條件的結果</p>
+          <button id="clear-filters-btn" style="margin-top:16px;padding:8px 24px;border:1px solid var(--brown);background:none;color:var(--brown);font-family:var(--font-serif);font-size:13px;letter-spacing:.14em;cursor:pointer">清除篩選</button>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <footer class="ys-footer">
+    <div class="ys-footer-brand">
+      <span style="font-size:15px;letter-spacing:.34em;color:var(--dark)">有鬆島</span>
+      <span style="font-family:var(--font-sans);font-size:9px;letter-spacing:.4em;color:var(--muted)">YOUSONG ISLAND</span>
+    </div>
+    <span class="ys-footer-copy">© 2026 · TAIWAN</span>
+  </footer>
+
+  <script src="/js/category.js"></script>
+</body>
+</html>
