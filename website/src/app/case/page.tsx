@@ -1,248 +1,166 @@
-"use client";
-
-import Image from "next/image";
+import type { Metadata } from "next";
 import Link from "next/link";
-import { BeforeAfter } from "@/components/BeforeAfter";
 
-export default function CasePage() {
+export const metadata: Metadata = {
+  title: "案例 — AI 代理人實戰成果 | Gentleyehstudio",
+  description:
+    "從品牌視覺到產業 AI 代理人，查看 Gentleyehstudio 的實際客戶成果：半導體展會視覺、醫療即時口譯、印刷校對系統、餐飲營運指標、LINE 客服機器人。",
+};
+
+const CASES = [
+  {
+    slug: "semiconductor",
+    category: "品牌視覺",
+    title: "半導體・識別卡改版",
+    desc: "設備製造商・國際展會主視覺與系列社群素材，Logo 鎖定不變形",
+    stats: [
+      { value: "1–2 天", label: "交期" },
+      { value: "3,000+", label: "素材產量" },
+    ],
+  },
+  {
+    slug: "medical-translator",
+    category: "醫療",
+    title: "醫療即時口譯",
+    desc: "協助第一線醫療人員與非母語病患即時溝通，降低問診誤解與等待時間",
+    stats: [
+      { value: "< 2秒", label: "口譯延遲" },
+      { value: "12+", label: "支援語言" },
+    ],
+  },
+  {
+    slug: "preflight-checker",
+    category: "印刷",
+    title: "印刷校對系統",
+    desc: "自動比對印前檔案與規格書，於送印前攔截色彩、尺寸與文字錯誤",
+    stats: [
+      { value: "-70%", label: "校稿時間" },
+      { value: "99.2%", label: "錯誤攔截率" },
+    ],
+  },
+  {
+    slug: "operations-dashboard",
+    category: "餐飲",
+    title: "餐飲業營運指標",
+    desc: "彙整各門店營收、出餐與庫存數據，管理者一眼掌握全店營運狀況",
+    stats: [
+      { value: "+18%", label: "營收成長" },
+      { value: "30+", label: "導入門店" },
+    ],
+  },
+  {
+    slug: "line-customer-service",
+    category: "客服",
+    title: "LINE OA 客服機器人",
+    desc: "串接 LINE 官方帳號，自動處理訂單查詢、常見問題與預約流程",
+    stats: [
+      { value: "< 5秒", label: "平均回覆" },
+      { value: "-60%", label: "客服工時" },
+    ],
+  },
+];
+
+export default function CaseListPage() {
   return (
-    <div
-      className="bg-paper"
-      style={{
-        paddingTop: "clamp(100px, 12vw, 160px)",
-        paddingBottom: "clamp(72px, 9vw, 128px)",
-      }}
-    >
-      <div className="max-w-[1280px] mx-auto px-5">
-        {/* Breadcrumb */}
-        <nav className="text-[13px] text-text-secondary mb-6">
-          <Link href="/" className="hover:text-red">
-            首頁
-          </Link>
-          <span className="mx-2">/</span>
-          <span>案例</span>
-          <span className="mx-2">/</span>
-          <span>半導體</span>
-          <span className="mx-2">/</span>
-          <span className="text-ink">Lulu</span>
-        </nav>
-
-        <h1
-          className="font-bold text-ink mb-3"
-          style={{
-            fontSize: "clamp(28px, 3.6vw, 48px)",
-            letterSpacing: "-.02em",
-          }}
-        >
-          企業形象：識別卡改版，風格一致
-        </h1>
-        <p className="text-[13px] text-text-muted mb-12">
-          每個區塊都是獨立畫框，可以直接截圖成社群貼文——案例內容為模板示意
-        </p>
-
-        {/* Case Blocks Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* 01 / 客戶產業 */}
-          <article
-            className="rounded-[18px] p-8 flex flex-col justify-between"
+    <>
+      <section
+        className="bg-paper"
+        style={{
+          paddingTop: "clamp(120px, 14vw, 200px)",
+          paddingBottom: "clamp(48px, 6vw, 80px)",
+        }}
+      >
+        <div className="max-w-[1080px] mx-auto px-5">
+          <p className="text-[11px] tracking-[.16em] uppercase font-medium text-text-secondary mb-6">
+            CASE STUDIES
+          </p>
+          <h1
+            className="font-bold text-ink"
             style={{
-              background: "linear-gradient(160deg, #f7f6f2 0%, #eeede8 100%)",
-              border: "1px solid #d8d9d1",
-              aspectRatio: "4/5",
+              fontSize: "clamp(32px, 4.4vw, 60px)",
+              lineHeight: 1.08,
+              letterSpacing: "-.025em",
             }}
           >
-            <div>
-              <p className="text-red font-bold text-[14px] mb-1">
-                01 / 客戶產業
-              </p>
-              <h2 className="text-[22px] font-bold text-ink mt-4">半導體</h2>
-              <p className="text-[14px] text-text-secondary mt-2 leading-relaxed">
-                設備製造商・國際展會主視覺與系列社群素材
-              </p>
-            </div>
-            <div className="flex items-center justify-between mt-auto pt-8">
-              <span className="text-[11px] font-bold tracking-tight text-ink">
-                GENTLEYEHSTUDIO<sup className="text-[7px]">®</sup>
-              </span>
-              <span className="text-[10px] text-text-muted tracking-[.12em]">
-                CASE 01 · 1/6
-              </span>
-            </div>
-          </article>
-
-          {/* 02 / 痛點 */}
-          <article
-            className="bg-dark text-white rounded-[18px] p-8 flex flex-col justify-between"
-            style={{ aspectRatio: "4/5" }}
-          >
-            <div>
-              <p className="text-red font-bold text-[14px] mb-1">02 / 痛點</p>
-              <p className="text-[20px] font-medium text-white/80 mt-6 leading-relaxed">
-                「AI
-                生的展場主視覺很漂亮，但 Logo
-                被改寫、整組風格對不起來」
-              </p>
-            </div>
-            <div className="flex items-center justify-between mt-auto pt-8">
-              <span className="text-[11px] font-bold tracking-tight text-white/60">
-                GENTLEYEHSTUDIO<sup className="text-[7px]">®</sup>
-              </span>
-              <span className="text-[10px] text-white/40 tracking-[.12em]">
-                CASE 01 · 2/6
-              </span>
-            </div>
-          </article>
-
-          {/* 03 / 流程 */}
-          <article
-            className="rounded-[18px] p-8 bg-white border border-hairline flex flex-col justify-between"
-            style={{ aspectRatio: "4/5" }}
-          >
-            <div>
-              <p className="text-red font-bold text-[14px] mb-6">03 / 流程</p>
-              <div className="flex flex-col gap-4">
-                {[
-                  { step: "生成場景", tag: "AGENT" },
-                  { step: "Logo 鎖定・去 AI 味", tag: "LULU" },
-                  { step: "展板輸出・社群尺寸", tag: "MILES" },
-                ].map((item) => (
-                  <div
-                    key={item.tag}
-                    className="flex items-center justify-between py-3 border-b border-hairline"
-                  >
-                    <span className="text-[16px] font-medium text-ink">
-                      {item.step}
-                    </span>
-                    <span className="text-[10px] tracking-[.14em] text-text-muted uppercase">
-                      {item.tag}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="flex items-center justify-between mt-auto pt-8">
-              <span className="text-[11px] font-bold tracking-tight text-ink">
-                GENTLEYEHSTUDIO<sup className="text-[7px]">®</sup>
-              </span>
-              <span className="text-[10px] text-text-muted tracking-[.12em]">
-                CASE 01 · 3/6
-              </span>
-            </div>
-          </article>
-
-          {/* 04 / 成果 */}
-          <article
-            className="rounded-[18px] p-8 bg-white border border-hairline flex flex-col justify-between"
-            style={{ aspectRatio: "4/5" }}
-          >
-            <div>
-              <p className="text-red font-bold text-[14px] mb-6">04 / 成果</p>
-              <BeforeAfter
-                beforeSrc="/assets/idcard-before.jpg"
-                afterSrc="/assets/idcard-after.jpg"
-                ratio="4/3"
-              />
-            </div>
-            <div className="flex items-center justify-between mt-auto pt-8">
-              <span className="text-[11px] font-bold tracking-tight text-ink">
-                GENTLEYEHSTUDIO<sup className="text-[7px]">®</sup>
-              </span>
-              <span className="text-[10px] text-text-muted tracking-[.12em]">
-                CASE 01 · 4/6
-              </span>
-            </div>
-          </article>
-
-          {/* 05 / 數據 */}
-          <article
-            className="rounded-[18px] p-8 bg-white border border-hairline flex flex-col justify-between"
-            style={{ aspectRatio: "4/5" }}
-          >
-            <div>
-              <p className="text-red font-bold text-[14px] mb-6">05 / 數據</p>
-              <div className="flex flex-col gap-8 mt-8">
-                <div>
-                  <p className="text-[11px] tracking-[.14em] text-text-secondary uppercase mb-2">
-                    交期
-                  </p>
-                  <p
-                    className="font-bold text-ink"
-                    style={{ fontSize: "clamp(34px, 3.8vw, 48px)" }}
-                  >
-                    1–2 天
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[11px] tracking-[.14em] text-text-secondary uppercase mb-2">
-                    素材產量
-                  </p>
-                  <p
-                    className="font-bold text-ink"
-                    style={{ fontSize: "clamp(34px, 3.8vw, 48px)" }}
-                  >
-                    3,000+ 張
-                  </p>
-                </div>
-              </div>
-              <p className="text-[12px] text-text-muted mt-6">
-                經客戶授權公開之實際數據
-              </p>
-            </div>
-            <div className="flex items-center justify-between mt-auto pt-8">
-              <span className="text-[11px] font-bold tracking-tight text-ink">
-                GENTLEYEHSTUDIO<sup className="text-[7px]">®</sup>
-              </span>
-              <span className="text-[10px] text-text-muted tracking-[.12em]">
-                CASE 01 · 5/6
-              </span>
-            </div>
-          </article>
-
-          {/* 06 / 相關服務 */}
-          <article
-            className="rounded-[18px] p-8 flex flex-col justify-between"
-            style={{
-              background: "linear-gradient(160deg, #f7f6f2 0%, #eeede8 100%)",
-              border: "1px solid #d8d9d1",
-              aspectRatio: "4/5",
-            }}
-          >
-            <div>
-              <p className="text-red font-bold text-[14px] mb-6">
-                06 / 相關服務
-              </p>
-              <h2
-                className="font-bold text-ink"
-                style={{ fontSize: "clamp(40px, 4.6vw, 60px)" }}
-              >
-                Hire Lulu
-              </h2>
-              <div className="flex flex-wrap gap-2 mt-6">
-                <span className="px-3 py-1.5 border border-ink rounded-full text-[12px] font-medium">
-                  Lulu · LogoLock
-                </span>
-                <span className="px-3 py-1.5 border border-ink rounded-full text-[12px] font-medium">
-                  Miles · LastMile
-                </span>
-              </div>
-              <Link
-                href="/agents"
-                className="inline-block mt-8 text-[14px] font-semibold text-ink hover:text-red transition-colors"
-              >
-                了解服務 →
-              </Link>
-            </div>
-            <div className="flex items-center justify-between mt-auto pt-8">
-              <span className="text-[11px] font-bold tracking-tight text-ink">
-                GENTLEYEHSTUDIO<sup className="text-[7px]">®</sup>
-              </span>
-              <span className="text-[10px] text-text-muted tracking-[.12em]">
-                CASE 01 · 6/6
-              </span>
-            </div>
-          </article>
+            案例
+          </h1>
+          <p className="text-text-secondary text-[16px] mt-4 max-w-lg leading-relaxed">
+            品牌視覺與產業 AI 代理人的實戰成果
+          </p>
         </div>
-      </div>
-    </div>
+      </section>
+
+      <section
+        className="bg-paper"
+        style={{ paddingBottom: "clamp(72px, 9vw, 128px)" }}
+      >
+        <div className="max-w-[1080px] mx-auto px-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {CASES.map((c) => (
+              <Link
+                key={c.slug}
+                href={`/case/${c.slug}`}
+                className="group rounded-[18px] p-8 flex flex-col justify-between bg-white border border-hairline hover:border-red/30 transition-colors hover:no-underline"
+                style={{ minHeight: "320px" }}
+              >
+                <div>
+                  <span className="text-[11px] tracking-[.14em] uppercase font-medium text-red">
+                    {c.category}
+                  </span>
+                  <h2 className="text-[22px] font-bold text-ink mt-3 group-hover:text-red transition-colors leading-snug">
+                    {c.title}
+                  </h2>
+                  <p className="text-[14px] text-text-secondary mt-3 leading-relaxed">
+                    {c.desc}
+                  </p>
+                </div>
+
+                <div className="flex gap-8 mt-8 pt-6 border-t border-hairline">
+                  {c.stats.map((s) => (
+                    <div key={s.label}>
+                      <p className="text-[24px] font-bold text-ink">
+                        {s.value}
+                      </p>
+                      <p className="text-[12px] text-text-muted mt-1">
+                        {s.label}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section
+        className="bg-dark text-white"
+        style={{
+          paddingTop: "clamp(72px, 9vw, 128px)",
+          paddingBottom: "clamp(72px, 9vw, 128px)",
+        }}
+      >
+        <div className="max-w-[760px] mx-auto px-5 text-center">
+          <p className="text-[11px] tracking-[.16em] text-white/50 uppercase mb-4">
+            LET&apos;S BUILD YOUR AGENT
+          </p>
+          <h2
+            className="font-bold"
+            style={{ fontSize: "clamp(28px, 3.6vw, 48px)" }}
+          >
+            讓 AI 成為你的日常夥伴
+          </h2>
+          <p className="text-white/50 text-[14px] mt-3 leading-relaxed max-w-md mx-auto">
+            從免費診斷開始——到店訪談與流程盤點，找出最值得優化的場景
+          </p>
+          <a
+            href="/agents#diagnose"
+            className="inline-flex items-center gap-2 mt-8 px-8 py-3.5 bg-white text-ink font-semibold text-[15px] rounded-full hover:bg-red hover:text-white transition-colors"
+          >
+            免費診斷
+          </a>
+        </div>
+      </section>
+    </>
   );
 }

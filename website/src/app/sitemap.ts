@@ -55,6 +55,36 @@ export default function sitemap(): MetadataRoute.Sitemap {
       url: `${base}/case`,
       lastModified: new Date(),
       changeFrequency: "monthly",
+      priority: 0.8,
+    },
+    {
+      url: `${base}/case/semiconductor`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.7,
+    },
+    {
+      url: `${base}/case/medical-translator`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.7,
+    },
+    {
+      url: `${base}/case/preflight-checker`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.7,
+    },
+    {
+      url: `${base}/case/operations-dashboard`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.7,
+    },
+    {
+      url: `${base}/case/line-customer-service`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
       priority: 0.7,
     },
   ];
