@@ -13,6 +13,7 @@
   --white: #FFFFFF;
   --font-serif: 'Noto Serif TC', serif;
   --font-display: 'Cormorant Garamond', serif;
+  --font-narrow: 'Barlow Condensed', sans-serif;
   --font-sans: 'Poppins', sans-serif;
 }
 
@@ -79,7 +80,7 @@ img { display: block; max-width: 100%; }
 }
 .ys-card-body { display: flex; flex-direction: column; gap: 12px; }
 .ys-card-title { display: flex; align-items: baseline; gap: 12px; }
-.ys-card-title-zh { font-size: 21px; font-weight: 400; letter-spacing: .14em; font-family: var(--font-sans), var(--font-serif); }
+.ys-card-title-zh { font-size: 21px; font-weight: 400; letter-spacing: .14em; font-family: var(--font-narrow), var(--font-serif); }
 .ys-card-title-en { font-family: var(--font-sans); font-size: 8.5px; letter-spacing: .34em; color: var(--muted-dark); }
 .ys-card-desc {
   font-size: 13.5px; font-weight: 300; line-height: 2;
@@ -153,7 +154,7 @@ nav.ys-nav a:hover { color: var(--white); }
 }
 .ys-detail-hero-content h1 {
   font-size: clamp(28px, 4vw, 48px); font-weight: 300; letter-spacing: .1em;
-  font-family: var(--font-sans), var(--font-serif);
+  font-family: var(--font-narrow), var(--font-serif);
 }
 .ys-detail-body {
   padding: clamp(48px, 8vh, 80px) clamp(20px, 4.5vw, 64px);
