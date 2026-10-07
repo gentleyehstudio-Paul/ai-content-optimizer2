@@ -125,11 +125,11 @@ export function TrainingContent() {
               letterSpacing: "-.025em",
             }}
           >
-            企業 AI 視覺培訓
+            企業 AI 課程・培訓
           </h1>
           <p className="text-white/60 text-[16px] mt-4 max-w-lg leading-relaxed">
             不只教你生成圖片——更教你如何在品牌安全的前提下，讓 AI
-            成為團隊的設計生產力
+            成為團隊的設計生產力。從 Midjourney 到印刷落地，即學即用。
           </p>
           <a
             href="#contact"
@@ -444,7 +444,7 @@ export function TrainingContent() {
             {
               "@context": "https://schema.org",
               "@type": "Course",
-              name: "企業 AI 視覺培訓 — AI 圖片生成基礎",
+              name: "企業 AI 課程 — AI 圖片生成基礎",
               description:
                 "為行銷、設計、企劃人員設計的 AI 圖片生成基礎課程，涵蓋 Midjourney、DALL-E、Stable Diffusion 等工具的操作與品牌應用",
               provider: {
@@ -462,7 +462,7 @@ export function TrainingContent() {
             {
               "@context": "https://schema.org",
               "@type": "Course",
-              name: "企業 AI 視覺培訓 — 品牌安全 AI 應用",
+              name: "企業 AI 課程 — 品牌安全 AI 應用",
               description:
                 "針對設計主管與品牌經理的進階 AI 視覺課程，學習 Logo 保護、LoRA 風格控制、去 AI 味技巧",
               provider: {
@@ -480,7 +480,7 @@ export function TrainingContent() {
             {
               "@context": "https://schema.org",
               "@type": "Course",
-              name: "企業 AI 視覺培訓 — AI 圖落地印刷",
+              name: "企業 AI 課程 — AI 圖落地印刷",
               description:
                 "學習將 AI 生成圖片放大到 300dpi 印刷品質，掌握 RGB 轉 CMYK、校色打樣等印刷前流程",
               provider: {

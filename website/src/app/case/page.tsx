@@ -4,7 +4,7 @@ import Link from "next/link";
 export const metadata: Metadata = {
   title: "案例 — AI 代理人實戰成果 | Gentleyehstudio",
   description:
-    "從品牌視覺到產業 AI 代理人，查看 Gentleyehstudio 的實際客戶成果：半導體展會視覺、醫療即時口譯、印刷校對系統、餐飲營運指標、LINE 客服機器人。",
+    "從品牌視覺到產業 AI 代理人，查看 Gentleyehstudio 的實際客戶成果：半導體展會視覺、醫療即時翻譯、印刷校對系統、餐飲營運指標、LINE 客服機器人。",
 };
 
 const CASES = [
@@ -21,7 +21,7 @@ const CASES = [
   {
     slug: "medical-translator",
     category: "醫療",
-    title: "醫療即時口譯",
+    title: "醫療即時翻譯",
     desc: "協助第一線醫療人員與非母語病患即時溝通，降低問診誤解與等待時間",
     stats: [
       { value: "< 2秒", label: "口譯延遲" },
