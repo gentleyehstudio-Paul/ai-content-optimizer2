@@ -26,12 +26,14 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-a {
-  color: inherit;
-  transition: color 0.2s;
-}
-a:hover {
-  color: #a63328;
+@layer base {
+  a {
+    color: inherit;
+    transition: color 0.2s;
+  }
+  a:hover {
+    color: #a63328;
+  }
 }
 
 .prose-article h2 {
