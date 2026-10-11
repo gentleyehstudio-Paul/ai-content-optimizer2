@@ -32,6 +32,12 @@
   .title h1{font-weight:400;font-size:clamp(28px,6vw,56px);letter-spacing:.4em;color:var(--gold-hi);padding-left:.4em}
   .title p{margin-top:16px;font-size:14px;letter-spacing:.2em;color:rgba(243,238,226,.55);line-height:1.9}
   body.started .title{opacity:0}
+  body.paper{background:#e7dfca;color:#16120c}
+  body.paper .info{color:rgba(22,18,12,.6)} body.paper .info b{color:#16120c}
+  body.paper .title h1{color:#16120c} body.paper .title p{color:rgba(22,18,12,.6)}
+  body.paper button{color:#16120c;background:rgba(231,223,202,.6);border-color:rgba(22,18,12,.4)}
+  body.paper button.on{background:rgba(22,18,12,.14);border-color:#16120c}
+  #rec{color:#d4452e}
   #msg{position:fixed;top:48px;left:0;right:0;text-align:center;font-size:13px;color:#e8a0a0;pointer-events:none}
 </style>
 </head>
@@ -59,6 +65,8 @@
   <button data-mode="pulse">躍動</button>
   <button data-mode="harmonic">共鳴</button>
   <span class="sep"></span>
+  <button id="bTheme">宣紙</button>
+  <button id="bRec">錄影</button>
   <button id="bFreeze">凍結</button>
   <button id="bSave">存為 PNG</button>
   <button id="bClear">清空</button>
@@ -71,19 +79,24 @@ const $ = id => document.getElementById(id);
 const cv = $('c'), ctx = cv.getContext('2d');
 let W = 0, H = 0, DPR = 1, CX = 0, CY = 0, R = 0;
 
+let paper = false;
+const bgRGB = () => paper ? '231,223,202' : '5,3,10';
+function paintBg(a){ ctx.globalCompositeOperation='source-over'; ctx.fillStyle=`rgba(${bgRGB()},${a})`; ctx.fillRect(0,0,W,H); }
+const comp = () => paper ? 'source-over' : 'lighter';
+
 function resize(){
   DPR = Math.min(window.devicePixelRatio || 1, 2);
   W = innerWidth; H = innerHeight;
   cv.width = W*DPR; cv.height = H*DPR;
   ctx.setTransform(DPR,0,0,DPR,0,0);
   CX = W/2; CY = H/2; R = Math.min(W,H)*0.42;
-  ctx.fillStyle = '#05030a'; ctx.fillRect(0,0,W,H);
+  paintBg(1);
 }
 addEventListener('resize', resize); resize();
 
 /* ---------------- Audio ---------------- */
 let ac = null, analyser = null, freqData = null, srcNode = null, micStream = null;
-let demoBus = null, demoOn = false;
+let demoBus = null, demoOn = false, recDest = null;
 const FFT = 8192;
 
 function ensureAudio(){
@@ -95,6 +108,8 @@ function ensureAudio(){
     analyser.minDecibels = -95; analyser.maxDecibels = -20;
     freqData = new Uint8Array(analyser.frequencyBinCount);
     demoBus = ac.createGain(); demoBus.gain.value = 0.9;
+    recDest = ac.createMediaStreamDestination();
+    demoBus.connect(recDest);
     demoBus.connect(analyser);               // 分析用
     const out = ac.createGain(); out.gain.value = 0.7;
     demoBus.connect(out); out.connect(ac.destination); // 可聽見
@@ -114,7 +129,7 @@ async function toggleMic(){
     // 關閉語音處理，保留颂钵原始泛音
     micStream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
     srcNode = ac.createMediaStreamSource(micStream);
-    srcNode.connect(analyser);               // 不接 destination，避免回授
+    srcNode.connect(analyser); srcNode.connect(recDest);              // 不接 destination，避免回授
     $('bMic').classList.add('on'); $('bMic').textContent = '麥克風運作中';
     document.body.classList.add('started');
   }catch(e){ say('無法使用麥克風：' + (e.message||e.name)); }
@@ -217,6 +232,11 @@ function lerp(a,b,t){ return a+(b-a)*t; }
 // t: 0 深紫 → 0.55 紫羅蘭 → 1 金
 function inkColor(t, a, lift=0){
   let r,g,b;
+  if (paper){ // 宣紙：墨黑，依音高微染紫→赭金
+    const k = Math.min(1,Math.max(0,t));
+    r = lerp(22, 150, k*k); g = lerp(18, 105, k*k); b = lerp(12+70*(1-k), 40, k);
+    return `rgba(${r|0},${g|0},${b|0},${Math.min(1,a*1.5)})`;
+  }
   if (t<.55){ const k=t/.55; r=lerp(42,150,k); g=lerp(20,90,k); b=lerp(80,210,k); }
   else { const k=(t-.55)/.45; r=lerp(150,245,k); g=lerp(90,215,k); b=lerp(210,150,k); }
   return `rgba(${r+lift|0},${g+lift|0},${b+lift|0},${a})`;
@@ -255,8 +275,7 @@ function step(now){
   // 殘影：能量越低，墨保留越久（冥想時像濕墨緩慢暈開）
   const fade = mode==='meditation' ? .035 : mode==='flow' ? .05 : .07;
   ctx.globalCompositeOperation = 'source-over';
-  ctx.fillStyle = `rgba(5,3,10,${fade})`;
-  ctx.fillRect(0,0,W,H);
+  paintBg(paper ? .14 : fade); // 8-bit 取整會讓小 alpha 留下殘影，宣紙需較大淡出量
 
   const baseT = state.hue;
   const speed = mode==='meditation' ? .35 : mode==='flow' ? .9 : mode==='pulse' ? 1.2 : .6;
@@ -266,7 +285,7 @@ function step(now){
   if (state.onset > .5 && burstQueue <= 0){ burstQueue = 220; blot(baseT); }
   let toBurst = Math.min(burstQueue, 60); burstQueue -= toBurst;
 
-  ctx.globalCompositeOperation = 'lighter';
+  ctx.globalCompositeOperation = comp();
   ctx.lineCap = 'round';
   for (let i=0;i<N;i++){
     const p = P[i];
@@ -307,7 +326,7 @@ function blot(t){
   g.addColorStop(.5, inkColor(t*.8, .10));
   g.addColorStop(1, inkColor(0, 0));
   const prev = ctx.globalCompositeOperation;
-  ctx.globalCompositeOperation = 'lighter';
+  ctx.globalCompositeOperation = comp();
   ctx.fillStyle = g; ctx.beginPath(); ctx.arc(CX,CY,r,0,Math.PI*2); ctx.fill();
   ctx.globalCompositeOperation = prev;
 }
@@ -373,7 +392,51 @@ $('bFreeze').onclick = () => {
   $('bFreeze').classList.toggle('on', frozen);
   $('bFreeze').textContent = frozen ? '繼續' : '凍結';
 };
-$('bClear').onclick = () => { ctx.globalCompositeOperation='source-over'; ctx.fillStyle='#05030a'; ctx.fillRect(0,0,W,H); };
+$('bClear').onclick = () => paintBg(1);
+$('bTheme').onclick = () => {
+  paper = !paper;
+  document.body.classList.toggle('paper', paper);
+  $('bTheme').textContent = paper ? '暗場' : '宣紙';
+  paintBg(1);
+};
+
+/* ---- 錄影（含聲音軌），沿用 Ink Engine 的 MediaRecorder 流程 ---- */
+let rec = null, recChunks = [], recTimer = 0, recStart = 0;
+function pickMime(){
+  for (const t of ['video/mp4;codecs=h264','video/mp4','video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'])
+    if (window.MediaRecorder && MediaRecorder.isTypeSupported(t)) return t;
+  return '';
+}
+function stopRec(){
+  if (rec && rec.state !== 'inactive') rec.stop();
+  clearInterval(recTimer);
+  $('bRec').classList.remove('on'); $('bRec').textContent = '錄影';
+}
+$('bRec').onclick = () => {
+  if (rec && rec.state === 'recording') return stopRec();
+  try{
+    ensureAudio();
+    document.body.classList.add('started');
+    const stream = cv.captureStream(30);
+    recDest.stream.getAudioTracks().forEach(t => stream.addTrack(t));
+    const mime = pickMime();
+    rec = new MediaRecorder(stream, mime ? {mimeType:mime, videoBitsPerSecond:8e6} : undefined);
+    recChunks = [];
+    rec.ondataavailable = e => { if (e.data && e.data.size) recChunks.push(e.data); };
+    rec.onstop = () => {
+      const type = rec.mimeType || mime || 'video/webm';
+      const blob = new Blob(recChunks, {type});
+      if (!blob.size) return say('錄影資料為空');
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `sound-ink-${Date.now()}.${type.includes('mp4') ? 'mp4' : 'webm'}`;
+      a.click(); setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+    };
+    rec.start(200); recStart = Date.now();
+    $('bRec').classList.add('on');
+    recTimer = setInterval(() => { const s = (Date.now()-recStart)/1000|0; $('bRec').textContent = `停止 ${s/60|0}:${String(s%60).padStart(2,'0')}`; }, 500);
+  }catch(e){ say('此瀏覽器不支援錄影'); }
+};
 $('bSave').onclick = () => {
   cv.toBlob(b => {
     const a = document.createElement('a');
