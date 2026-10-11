@@ -11,6 +11,7 @@
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%;background:var(--void);color:var(--white);
     font-family:"Noto Serif TC","Songti TC",serif;overflow:hidden;-webkit-user-select:none;user-select:none}
+  #ov{pointer-events:none}
   canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
   .hud{position:fixed;left:16px;right:16px;bottom:max(16px,env(safe-area-inset-bottom));
     display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center;
@@ -43,6 +44,7 @@
 </head>
 <body>
 <canvas id="c"></canvas>
+<canvas id="ov"></canvas>
 
 <div class="title">
   <h1>聲 墨 生 花</h1>
@@ -67,6 +69,7 @@
   <button data-mode="harmonic">共鳴</button>
   <span class="sep"></span>
   <button id="bTheme">宣紙</button>
+  <button id="bTag">標註</button>
   <button id="bRec">錄影</button>
   <button id="bFreeze">凍結</button>
   <button id="bSave">存為 PNG</button>
@@ -78,6 +81,8 @@
 'use strict';
 const $ = id => document.getElementById(id);
 const cv = $('c'), ctx = cv.getContext('2d');
+const ov = $('ov'), octx = ov.getContext('2d');
+const ex = document.createElement('canvas'), ectx = ex.getContext('2d'); // 匯出用：底圖 + 標註層合成
 let W = 0, H = 0, DPR = 1, CX = 0, CY = 0, R = 0;
 
 let paper = false;
@@ -90,6 +95,7 @@ function resize(){
   W = innerWidth; H = innerHeight;
   cv.width = W*DPR; cv.height = H*DPR;
   ctx.setTransform(DPR,0,0,DPR,0,0);
+  ov.width = cv.width; ov.height = cv.height; octx.setTransform(DPR,0,0,DPR,0,0);
   CX = W/2; CY = H/2; R = Math.min(W,H)*0.42;
   paintBg(1);
 }
@@ -441,6 +447,62 @@ function camStrokes(baseT){
   }
 }
 
+
+/* ---------------- 標註網絡 Tracking tags ----------------
+   在鏡頭動態/邊緣最強處長出節點：小方框 + 程式碼式標籤 + 弧線連接。
+   節點數量隨聲音能量與擊缽增加；標籤數字即時顯示頻率與能量。
+   畫在獨立透明層（每幀清除），文字才不會被墨的殘影糊掉。 */
+let tagsOn = false, nodes = [], nodeId = 0, tagFrame = 0;
+const POOL = ['(loop (format t "~%"))','[loop (format t "~%")]','(dolist (x ink) (draw x))','(setf bowl (fft buf))','(let ((f peak)) (wash f))','(when onset (bloom))'];
+
+function updateNodes(){
+  const sc = Math.max(W/CW, H/CH), ox = (W-CW*sc)/2, oy = (H-CH*sc)/2;
+  const cand = [];
+  for (const a of camAnchors){
+    const fx = camAt(camFx,a.x,a.y), fy = camAt(camFy,a.x,a.y);
+    const sc2 = Math.hypot(fx,fy)*1.5 + Math.hypot(camAt(camGx,a.x,a.y),camAt(camGy,a.x,a.y))*.35;
+    if (sc2 > .5) cand.push({x:a.x*sc+ox, y:a.y*sc+oy, s:sc2});
+  }
+  cand.sort((a,b)=>b.s-a.s);
+  const want = 7 + (state.energy*14 + state.onset*10)|0, gap = Math.max(26, Math.min(W,H)*.045);
+  nodes.forEach(n => n.life -= 1);
+  for (const c of cand.slice(0,80)){
+    if (nodes.filter(n=>n.life>0).length >= want) break;
+    if (nodes.some(n => n.life>0 && Math.hypot(n.x-c.x,n.y-c.y) < gap)) continue;
+    nodes.push({x:c.x, y:c.y, life:45+Math.random()*40|0, max:85, id:nodeId++, txt:POOL[Math.random()*POOL.length|0], w:10+Math.random()*10, h:5+Math.random()*4});
+  }
+  nodes = nodes.filter(n => n.life > 0);
+}
+
+function drawTags(baseT){
+  octx.clearRect(0,0,W,H);
+  if (!camStream || !tagsOn) return;
+  if (tagFrame++ % 4 === 0) updateNodes();
+  const fs = Math.max(8, Math.min(W,H)*.012), mx = camMirror;
+  const fg = paper ? '22,18,12' : '243,238,226', acc = '212,69,46';
+  octx.font = `${fs}px ui-monospace,Menlo,monospace`; octx.textBaseline = 'top'; octx.lineWidth = .7;
+  const X = n => mx ? W-n.x : n.x;
+  const al = n => Math.min(1, n.life/12, (n.max-n.life)/6 + .2);
+  // 弧線：每個節點連最近的兩個
+  nodes.forEach(n => {
+    const near = nodes.filter(m=>m!==n).sort((a,b)=>Math.hypot(a.x-n.x,a.y-n.y)-Math.hypot(b.x-n.x,b.y-n.y)).slice(0,2);
+    near.forEach(m => {
+      const x1=X(n), y1=n.y, x2=X(m), y2=m.y, cx=(x1+x2)/2-(y2-y1)*.18, cy=(y1+y2)/2+(x2-x1)*.18;
+      octx.strokeStyle = `rgba(${fg},${.28*Math.min(al(n),al(m))})`;
+      octx.beginPath(); octx.moveTo(x1,y1); octx.quadraticCurveTo(cx,cy,x2,y2); octx.stroke();
+    });
+  });
+  nodes.forEach(n => {
+    const x = X(n), y = n.y, a = al(n);
+    octx.strokeStyle = `rgba(${fg},${.9*a})`; octx.strokeRect(x-n.w/2, y-n.h/2, n.w, n.h);
+    octx.fillStyle = `rgba(${acc},${.9*a})`; octx.fillRect(x-n.w/2, y-n.h/2, 3, n.h);   // 紅色標記
+    octx.fillStyle = `rgba(${fg},${.85*a})`;
+    octx.fillText(n.txt, x+n.w/2+3, y-fs);
+    const f = state.freq ? (state.freq*10+n.id).toFixed(1) : (16000+n.id).toFixed(1);
+    octx.fillText(`${f}  e=${state.energy.toFixed(2)}`, x+n.w/2+3, y);
+  });
+}
+
 /* ---------------- Loop & UI ---------------- */
 let lastInput = performance.now();
 function frame(now){
@@ -449,6 +511,8 @@ function frame(now){
   analyse();
   pickMode(now);
   step(now);
+  drawTags(state.hue);
+  if (rec && rec.state === 'recording') composeExport();
   $('iMode').textContent = MODES[mode];
   $('iFreq').textContent = state.energy>.02 && state.freq ? state.freq.toFixed(1) : '—';
   document.body.classList.toggle('idle', now - lastInput > 5000 && document.body.classList.contains('started'));
@@ -492,6 +556,17 @@ $('bTheme').onclick = () => {
   paintBg(1);
 };
 
+function composeExport(){
+  if (ex.width !== cv.width) { ex.width = cv.width; ex.height = cv.height; }
+  ectx.setTransform(1,0,0,1,0,0);
+  ectx.drawImage(cv,0,0); ectx.drawImage(ov,0,0);
+}
+$('bTag').onclick = () => {
+  tagsOn = !tagsOn; $('bTag').classList.toggle('on', tagsOn);
+  if (tagsOn && !camStream) say('標註需要先開啟鏡頭');
+  if (!tagsOn){ octx.clearRect(0,0,W,H); nodes = []; }
+};
+
 /* ---- 錄影（含聲音軌），沿用 Ink Engine 的 MediaRecorder 流程 ---- */
 let rec = null, recChunks = [], recTimer = 0, recStart = 0;
 function pickMime(){
@@ -509,7 +584,8 @@ $('bRec').onclick = () => {
   try{
     ensureAudio();
     document.body.classList.add('started');
-    const stream = cv.captureStream(30);
+    composeExport();
+    const stream = ex.captureStream(30);
     recDest.stream.getAudioTracks().forEach(t => stream.addTrack(t));
     const mime = pickMime();
     rec = new MediaRecorder(stream, mime ? {mimeType:mime, videoBitsPerSecond:8e6} : undefined);
@@ -530,7 +606,8 @@ $('bRec').onclick = () => {
   }catch(e){ say('此瀏覽器不支援錄影'); }
 };
 $('bSave').onclick = () => {
-  cv.toBlob(b => {
+  composeExport();
+  ex.toBlob(b => {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(b);
     a.download = `sound-ink-${new Date().toISOString().replace(/[:.]/g,'-')}.png`;
