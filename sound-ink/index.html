@@ -58,6 +58,7 @@
 <div class="hud">
   <button id="bMic">開啟麥克風</button>
   <button id="bDemo">示範颂钵</button>
+  <button id="bCam">開啟鏡頭</button>
   <span class="sep"></span>
   <button data-mode="auto" class="on">自動</button>
   <button data-mode="meditation">冥想</button>
@@ -314,6 +315,7 @@ function step(now){
     ctx.beginPath(); ctx.moveTo(p.px,p.py); ctx.lineTo(p.x,p.y); ctx.stroke();
   }
 
+  if (camStream) camStrokes(baseT);
   if (mode==='harmonic' || state.peaks.length>=2) rings(baseT);
   ctx.globalCompositeOperation = 'source-over';
 }
@@ -350,6 +352,95 @@ function rings(t){
   });
 }
 
+
+/* ---------------- Camera → ink strokes (聲音調制) ----------------
+   鏡頭提供「形」（邊緣、動態），聲音提供「勢」：
+   能量→墨量與線長、擊缽→爆發加粗、音高→墨色、模式→筆走方向。 */
+let camStream = null, camVid = null, camMirror = false;
+const CW = 240; let CH = 0, camLum, camPrev, camGx, camGy, camFx, camFy, camAnchors = [];
+const camWork = document.createElement('canvas'), camCtx = camWork.getContext('2d', {willReadFrequently:true});
+const sstep = (a,b,x) => { const t = Math.max(0,Math.min(1,(x-a)/(b-a||1e-6))); return t*t*(3-2*t); };
+const hash = n => { const x = Math.sin(n*127.1+311.7)*43758.5453; return x-Math.floor(x); };
+
+function setupCam(){
+  const vw = camVid.videoWidth||1280, vh = camVid.videoHeight||720;
+  CH = Math.round(CW*vh/vw);
+  camWork.width = CW; camWork.height = CH;
+  const n = CW*CH;
+  camLum = new Float32Array(n); camPrev = new Float32Array(n);
+  camGx = new Float32Array(n); camGy = new Float32Array(n);
+  camFx = new Float32Array(n); camFy = new Float32Array(n);
+  camAnchors = [];
+  const st = 4;
+  for (let y=st;y<CH-st;y+=st) for (let x=st;x<CW-st;x+=st){
+    const i = y*CW+x;
+    camAnchors.push({x:x+(hash(i)-.5)*st*.9, y:y+(hash(i+9871)-.5)*st*.9, jl:.7+hash(i+777)*.7, ja:(hash(i+555)-.5)*.5, ph:hash(i+1234)*6.28});
+  }
+}
+async function toggleCam(){
+  if (camStream){
+    camStream.getTracks().forEach(t=>t.stop()); camStream = null;
+    $('bCam').classList.remove('on'); $('bCam').textContent = '開啟鏡頭'; return;
+  }
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}},audio:false});
+    camVid = camVid || Object.assign(document.createElement('video'), {muted:true, playsInline:true});
+    camVid.srcObject = stream; await camVid.play();
+    camMirror = (stream.getVideoTracks()[0].getSettings().facingMode || 'user') !== 'environment';
+    camStream = stream; setupCam();
+    document.body.classList.add('started');
+    $('bCam').classList.add('on'); $('bCam').textContent = '鏡頭運作中';
+  }catch(e){ say('無法使用鏡頭：' + (e.message||e.name)); }
+}
+
+function computeCam(){
+  camCtx.drawImage(camVid,0,0,CW,CH);
+  const d = camCtx.getImageData(0,0,CW,CH).data, n = CW*CH;
+  for (let i=0,p=0;p<n;i+=4,p++){ camPrev[p] = camLum[p]; camLum[p] = (d[i]*.299+d[i+1]*.587+d[i+2]*.114)/255; }
+  for (let y=1;y<CH-1;y++) for (let x=1;x<CW-1;x++){
+    const i = y*CW+x, L = camLum, M = camPrev;
+    camGx[i] = (L[i-CW+1]+2*L[i+1]+L[i+CW+1])-(L[i-CW-1]+2*L[i-1]+L[i+CW-1]);
+    camGy[i] = (L[i+CW-1]+2*L[i+CW]+L[i+CW+1])-(L[i-CW-1]+2*L[i-CW]+L[i-CW+1]);
+    // 動態：幀差的梯度當作流向，並加一點下沉的重力
+    const a = (j)=>Math.abs(L[j]-M[j])*8;
+    camFx[i] = (a(i-CW+1)+2*a(i+1)+a(i+CW+1))-(a(i-CW-1)+2*a(i-1)+a(i+CW-1));
+    camFy[i] = (a(i+CW-1)+2*a(i+CW)+a(i+CW+1))-(a(i-CW-1)+2*a(i-CW)+a(i-CW+1)) + .6;
+  }
+}
+const camAt = (arr,x,y) => arr[(y|0)*CW + (x|0)];
+
+function camStrokes(baseT){
+  computeCam();
+  const e = state.energy, on = state.onset;
+  const sc = Math.max(W/CW, H/CH), ox = (W-CW*sc)/2, oy = (H-CH*sc)/2;
+  const thr = Math.max(.2, .9 - e*.55 - on*.35);          // 越響，越多線浮現
+  const gainInk = .22 + e*.7 + on*.6;                      // 靜時淡墨，聲響時濃
+  const lenK = sc*2.4*(1 + e*1.6 + on*2.4);
+  ctx.lineCap = 'round';
+  for (const a of camAnchors){
+    const gx = camAt(camGx,a.x,a.y), gy = camAt(camGy,a.x,a.y);
+    const mag = Math.hypot(gx,gy);
+    const edge = sstep(thr, thr+.6, mag);
+    if (edge < .04) continue;
+    const L = camAt(camLum,a.x,a.y);
+    const ink = Math.min(.85, edge*(.35+.65*(1-L))*gainInk);
+    if (ink < .03) continue;
+    let tx = -gy/(mag||1), ty = gx/(mag||1);               // 邊緣切線
+    const px = a.x*sc+ox, py = a.y*sc+oy;
+    const rx = px-CX, ry = py-CY, rd = Math.hypot(rx,ry)||1;
+    if (mode==='flow'){ const fx = camAt(camFx,a.x,a.y), fy = camAt(camFy,a.x,a.y), fm = Math.hypot(fx,fy);
+      if (fm>.05){ tx = tx*.4 + fx/fm*.6; ty = ty*.4 + fy/fm*.6; } }
+    else if (mode==='pulse'){ tx += rx/rd*(.6+on); ty += ry/rd*(.6+on); }
+    else if (mode==='harmonic'){ tx += -ry/rd*.9; ty += rx/rd*.9; }
+    else { tx += Math.sin(T*.4+a.ph)*.15; ty += Math.cos(T*.4+a.ph)*.15; }
+    const tm = Math.hypot(tx,ty)||1, len = lenK*(.5+edge)*a.jl*.5;
+    const sx = camMirror ? W-px : px, dx = (camMirror?-1:1)*tx/tm*len, dy = ty/tm*len;
+    ctx.strokeStyle = inkColor(Math.min(1,Math.max(0,baseT+(a.jl-1)*.2)), ink, on>.4?20:0);
+    ctx.lineWidth = .7 + ink*2.2*(1+on);
+    ctx.beginPath(); ctx.moveTo(sx-dx,py-dy); ctx.lineTo(sx+dx,py+dy); ctx.stroke();
+  }
+}
+
 /* ---------------- Loop & UI ---------------- */
 let lastInput = performance.now();
 function frame(now){
@@ -373,6 +464,7 @@ cv.addEventListener('pointerdown', e => {
 });
 
 $('bMic').onclick = toggleMic;
+$('bCam').onclick = toggleCam;
 $('bDemo').onclick = () => {
   demoOn = !demoOn;
   $('bDemo').classList.toggle('on', demoOn);
