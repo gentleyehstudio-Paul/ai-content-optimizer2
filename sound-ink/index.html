@@ -58,6 +58,8 @@
 <div id="msg"></div>
 
 <div class="hud">
+  <button id="bGo">一鍵創作</button>
+  <span class="sep"></span>
   <button id="bMic">開啟麥克風</button>
   <button id="bDemo">示範颂钵</button>
   <button id="bCam">開啟鏡頭</button>
@@ -275,31 +277,27 @@ function field(x,y,t){
 }
 
 let T = 0, burstQueue = 0, frozen = false;
-// 追蹤到物件時，背景（粒子流、諧波環、鏡頭墨痕）漸漸淡出，讓物件框與標籤突顯；物件消失後緩緩回復
-let dimV = 0, bgK = 1;
-
 function step(now){
   const dt = 1;
-  dimV += ((objOn && objs.length ? 1 : 0) - dimV) * .08;
-  bgK = 1 - .85*dimV;
+  const bg = !camStream;   // 開啟鏡頭後不畫背景（粒子流/諧波環/墨暈），畫面只剩鏡頭生成的墨影像
   T += .016;
   const e = state.energy;
   // 殘影：能量越低，墨保留越久（冥想時像濕墨緩慢暈開）
-  const fade = mode==='meditation' ? .035 : mode==='flow' ? .05 : .07;
+  const fade = camStream ? .12 : mode==='meditation' ? .035 : mode==='flow' ? .05 : .07;
   ctx.globalCompositeOperation = 'source-over';
-  paintBg(paper ? .14 : fade + dimV*.04);   // 淡出時加快殘影消退 // 8-bit 取整會讓小 alpha 留下殘影，宣紙需較大淡出量
+  paintBg(paper ? .15 : fade);   // 8-bit 取整會讓小 alpha 留下殘影，宣紙需較大淡出量
 
   const baseT = state.hue;
   const speed = mode==='meditation' ? .35 : mode==='flow' ? .9 : mode==='pulse' ? 1.2 : .6;
   const gain = 1 + e*3;
 
   // 擊缽：湧出墨暈
-  if (state.onset > .5 && burstQueue <= 0){ burstQueue = 220; blot(baseT); }
+  if (bg && state.onset > .5 && burstQueue <= 0){ burstQueue = 220; blot(baseT); }
   let toBurst = Math.min(burstQueue, 60); burstQueue -= toBurst;
 
   ctx.globalCompositeOperation = comp();
   ctx.lineCap = 'round';
-  for (let i=0;i<N;i++){
+  for (let i=0;bg && i<N;i++){
     const p = P[i];
     if (p.life >= p.max){
       if (toBurst>0){ spawn(p, 1+state.onset*1.5); toBurst--; } else spawn(p);
@@ -320,15 +318,15 @@ function step(now){
 
     const lf = p.life/p.max, fadeIO = Math.min(1, lf*6)*(1-lf);
     const t = Math.min(1, Math.max(0, baseT + (p.seed-.5)*.35 + (p.burst?.1:0)));
-    const alpha = fadeIO * (p.burst ? .55 : .28 + e*.5) * bgK;
+    const alpha = fadeIO * (p.burst ? .55 : .28 + e*.5);
     ctx.strokeStyle = inkColor(t, alpha, p.burst?25:0);
     ctx.lineWidth = p.w * 1.6 * (p.burst ? (1-lf*.6) : 1) * (1 + e*1.5);
     ctx.beginPath(); ctx.moveTo(p.px,p.py); ctx.lineTo(p.x,p.y); ctx.stroke();
   }
 
   if (camStream) camStrokes(baseT);
-  if (objOn) objectInk(baseT);
-  if (mode==='harmonic' || state.peaks.length>=2) rings(baseT);
+  if (objOn) { objectInk(baseT); handInk(baseT); }
+  if (bg && (mode==='harmonic' || state.peaks.length>=2)) rings(baseT);
   ctx.globalCompositeOperation = 'source-over';
 }
 
@@ -353,7 +351,7 @@ function rings(t){
     const rad = R*(.18 + i*.17);
     const amp = p.a*R*.025*(1+state.onset);
     const lobes = 3 + i*2;
-    ctx.strokeStyle = inkColor(Math.min(1, t+.18+i*.05), .10+p.a*.3, 0).replace(/[\d.]+\)$/, m => (parseFloat(m)*bgK*bgK).toFixed(3)+')');
+    ctx.strokeStyle = inkColor(Math.min(1, t+.18+i*.05), .10+p.a*.3, 0);
     ctx.beginPath();
     for (let a=0;a<=Math.PI*2+.05;a+=.05){
       const rr = rad + Math.sin(a*lobes + T*(.6+i*.25))*amp;
@@ -416,7 +414,7 @@ function setupCam(){
 }
 async function toggleCam(){
   if (camStream){
-    camStream.getTracks().forEach(t=>t.stop()); camStream = null; objs = []; objOn = false;
+    camStream.getTracks().forEach(t=>t.stop()); camStream = null; objs = []; hands = []; objOn = false;
     $('bObj').classList.remove('on'); $('bObj').textContent = '物件追蹤';
     $('bCam').classList.remove('on'); $('bCam').textContent = '開啟鏡頭'; return;
   }
@@ -447,8 +445,27 @@ function computeCam(){
 }
 const camAt = (arr,x,y) => arr[(y|0)*CW + (x|0)];
 
+let washC = null, washX = null, washImg = null;
+// 染：鏡頭明暗轉為墨色濃淡（宣紙＝暗處為墨；暗場＝亮處發光），濃度隨聲音能量與擊缽
+function camWash(baseT){
+  if (!washC){ washC = document.createElement('canvas'); washC.width = CW; washC.height = CH; washX = washC.getContext('2d'); washImg = washX.createImageData(CW,CH); }
+  const d = washImg.data, n = CW*CH, e = state.energy, on = state.onset;
+  const col = paper ? [22,18,12] : [lerp(90,240,baseT), lerp(50,200,baseT), lerp(190,120,baseT)];
+  for (let p=0,i=0;p<n;p++,i+=4){
+    const L = camLum[p], a = paper ? Math.pow(1-L,1.7) : Math.pow(L,2.2);
+    d[i]=col[0]; d[i+1]=col[1]; d[i+2]=col[2]; d[i+3]=a*255;
+  }
+  washX.putImageData(washImg,0,0);
+  const sc = Math.max(W/CW, H/CH), ox = (W-CW*sc)/2, oy = (H-CH*sc)/2;
+  ctx.globalAlpha = Math.min(.5, (paper ? .05 : .01) + e*(paper ? .2 : .06) + on*(paper ? .15 : .1));
+  ctx.save(); if (camMirror){ ctx.translate(W,0); ctx.scale(-1,1); }
+  ctx.drawImage(washC, ox, oy, CW*sc, CH*sc);
+  ctx.restore(); ctx.globalAlpha = 1;
+}
+
 function camStrokes(baseT){
   computeCam();
+  camWash(baseT);
   const e = state.energy, on = state.onset;
   const sc = Math.max(W/CW, H/CH), ox = (W-CW*sc)/2, oy = (H-CH*sc)/2;
   const thr = Math.max(.2, .9 - e*.55 - on*.35);          // 越響，越多線浮現
@@ -474,7 +491,7 @@ function camStrokes(baseT){
     const tm = Math.hypot(tx,ty)||1, len = lenK*(.5+edge)*a.jl*.5;
     const sx = camMirror ? W-px : px, dx = (camMirror?-1:1)*tx/tm*len, dy = ty/tm*len;
     const tt = Math.min(1,Math.max(0,baseT+(a.jl-1)*.2)), ang = Math.atan2(dy,dx);
-    stamp(sx, py, len*2.2, 3+ink*8*(1+on), ang, tt, Math.min(paper?.26:.12, ink*(paper?.3:.16))*(1-.6*dimV));   // 暗場用加法混色，須更淡          // 霧狀墨痕
+    stamp(sx, py, len*2.2, 3+ink*8*(1+on), ang, tt, Math.min(paper?.26:.12, ink*(paper?.3:.16)));    // 暗場用加法混色，須更淡          // 霧狀墨痕
     if (a.jl > 1.2){                                                                    // 零星墨點
       ctx.fillStyle = inkColor(tt, Math.min(.9, ink*1.2));
       ctx.fillRect(sx+(hash(a.ph*91)-.5)*len*3, py+(hash(a.ph*37)-.5)*len*3, 1.6, 1.6);
@@ -512,8 +529,8 @@ function updateNodes(){
 function drawTags(baseT){
   octx.clearRect(0,0,W,H);
   if (!camStream) return;
-  if (objOn) drawObjects(performance.now());
-  if (!tagsOn) return;
+  if (objOn){ drawObjects(performance.now()); drawHands(performance.now()); }
+  if (!tagsOn || objs.length || hands.length) return;   // 已有貼合的追蹤時，不再疊動態節點
   if (tagFrame++ % 4 === 0) updateNodes();
   const fs = Math.max(8, Math.min(W,H)*.012), mx = camMirror;
   const fg = paper ? '22,18,12' : '243,238,226', acc = '212,69,46';
@@ -551,19 +568,33 @@ const OBJ_MODEL = 'https://storage.googleapis.com/mediapipe-models/object_detect
 let objOn = false, objDet = null, objLoading = false, objs = [], objSeen = 0, objLastVT = -1, objTs = 0, objLastRun = 0;
 const ZH = {person:'人',bowl:'缽',cup:'杯',bottle:'瓶','wine glass':'杯',vase:'花器',book:'書',laptop:'筆電','cell phone':'手機',chair:'椅',couch:'沙發',bed:'床','potted plant':'盆栽',clock:'鐘',scissors:'剪刀',keyboard:'鍵盤',mouse:'滑鼠',tv:'螢幕',cat:'貓',dog:'狗',bird:'鳥',umbrella:'傘',backpack:'背包',handbag:'手袋',spoon:'匙',knife:'刀',fork:'叉','dining table':'桌'};
 
-async function loadObjects(){
-  if (objDet || objLoading) return;
-  objLoading = true; $('bObj').textContent = '載入模型…';
-  try{
+let visionP = null;
+function getVision(){
+  return visionP || (visionP = (async () => {
     const mod = await import(MP_BASE + '/vision_bundle.mjs');
-    const fileset = await mod.FilesetResolver.forVisionTasks(MP_BASE + '/wasm');
-    const opts = delegate => ({baseOptions:{modelAssetPath:OBJ_MODEL, delegate}, runningMode:'VIDEO', scoreThreshold:.35, maxResults:10});
-    try{ objDet = await mod.ObjectDetector.createFromOptions(fileset, opts('GPU')); }
-    catch(_){ objDet = await mod.ObjectDetector.createFromOptions(fileset, opts('CPU')); }
-    $('bObj').textContent = '物件追蹤中';
-  }catch(e){
+    return {mod, fileset: await mod.FilesetResolver.forVisionTasks(MP_BASE + '/wasm')};
+  })().catch(e => { visionP = null; throw e; }));
+}
+async function makeTask(cls, extra){
+  const {mod, fileset} = await getVision();
+  const opts = delegate => ({runningMode:'VIDEO', ...extra, baseOptions:{...extra.baseOptions, delegate}});
+  try{ return await mod[cls].createFromOptions(fileset, opts('GPU')); }
+  catch(_){ return await mod[cls].createFromOptions(fileset, opts('CPU')); }
+}
+async function loadObjects(){
+  if ((objDet && handLm) || objLoading) return;
+  objLoading = true; $('bObj').textContent = '載入模型…';
+  const [o, h] = await Promise.allSettled([
+    objDet ? objDet : makeTask('ObjectDetector', {baseOptions:{modelAssetPath:OBJ_MODEL}, scoreThreshold:.35, maxResults:10}),
+    handLm ? handLm : makeTask('HandLandmarker', {baseOptions:{modelAssetPath:HAND_MODEL}, numHands:2})]);
+  if (o.status === 'fulfilled') objDet = o.value;
+  if (h.status === 'fulfilled') handLm = h.value;
+  if (!objDet && !handLm){
     objOn = false; $('bObj').classList.remove('on'); $('bObj').textContent = '物件追蹤';
-    say('物件模型載入失敗：' + (e.message||e)); console.error(e);
+    say('追蹤模型載入失敗：' + ((o.reason||h.reason).message||o.reason)); console.error(o.reason, h.reason);
+  } else {
+    if (!objDet) say('物件模型載入失敗，僅追蹤手部'); else if (!handLm) say('手部模型載入失敗，僅追蹤物件');
+    if (objOn) $('bObj').textContent = '物件追蹤中';
   }
   objLoading = false;
 }
@@ -587,52 +618,151 @@ function detectObjects(now){
   objs = next.map(n => {
     let best = null, bd = Math.max(W,H)*.25;
     objs.forEach(o => { if (o.name !== n.name) return; const d = Math.hypot(o.x+o.w/2-n.x-n.w/2, o.y+o.h/2-n.y-n.h/2); if (d < bd){ bd = d; best = o; } });
-    if (best){ const k = .5; n.x = best.x+(n.x-best.x)*k; n.y = best.y+(n.y-best.y)*k; n.w = best.w+(n.w-best.w)*k; n.h = best.h+(n.h-best.h)*k; n.id = best.id; }
+    if (best){ const k = .5; n.x = best.x+(n.x-best.x)*k; n.y = best.y+(n.y-best.y)*k; n.w = best.w+(n.w-best.w)*k; n.h = best.h+(n.h-best.h)*k; n.id = best.id; n.nodes = best.nodes; n.gap = best.gap; }
     else n.id = ++objId;
     return n;
   });
 }
 let objId = 0;
 
+function convexHull(pts){
+  const p = pts.slice().sort((a,b)=>a.x-b.x||a.y-b.y), cr = (o,a,b)=>(a.x-o.x)*(b.y-o.y)-(a.y-o.y)*(b.x-o.x);
+  const lo = [], up = [];
+  for (const q of p){ while (lo.length>=2 && cr(lo[lo.length-2],lo[lo.length-1],q)<=0) lo.pop(); lo.push(q); }
+  for (let i=p.length-1;i>=0;i--){ const q = p[i]; while (up.length>=2 && cr(up[up.length-2],up[up.length-1],q)<=0) up.pop(); up.push(q); }
+  up.pop(); lo.pop(); return lo.concat(up);
+}
+
+// 節點吸附：在物件框內，取鏡頭邊緣/動態最強的點，彼此保持間距 → 節點貼著物件的真實形狀
+function snapNodes(o, gap, cap){
+  const sc = Math.max(W/CW, H/CH), ox = (W-CW*sc)/2, oy = (H-CH*sc)/2;
+  const x0 = o.x-o.w*.02, x1 = o.x+o.w*1.02, y0 = o.y-o.h*.02, y1 = o.y+o.h*1.02, cand = [];
+  for (const a of camAnchors){
+    const px = a.x*sc+ox, py = a.y*sc+oy, sx = camMirror ? W-px : px;
+    if (sx<x0 || sx>x1 || py<y0 || py>y1) continue;
+    const m = Math.hypot(camAt(camGx,a.x,a.y),camAt(camGy,a.x,a.y)) + Math.hypot(camAt(camFx,a.x,a.y),camAt(camFy,a.x,a.y))*1.2;
+    if (m > .35) cand.push({x:sx, y:py, s:m});
+  }
+  cand.sort((a,b)=>b.s-a.s);
+  const out = [];
+  for (const c of cand){ if (out.length >= cap) break; if (out.every(q => Math.hypot(q.x-c.x,q.y-c.y) >= gap)) out.push(c); }
+  return out;
+}
+let objFrame = 0;
+const objGap = o => Math.max(12, Math.min(o.w,o.h)/7);
+
 function drawObjects(now){
   detectObjects(now);
   if (!objs.length) return;
+  objFrame++;
   const fg = paper ? '22,18,12' : '243,238,226', acc = '212,69,46', e = state.energy, on = state.onset;
   const fs = Math.max(8, Math.min(W,H)*.012);
-  octx.font = `${fs}px ui-monospace,Menlo,monospace`; octx.textBaseline = 'top'; octx.lineWidth = 1;
-  // 物件之間的弧線
-  objs.forEach((o,i) => objs.slice(i+1).forEach(m => {
-    const x1=o.x+o.w/2, y1=o.y+o.h/2, x2=m.x+m.w/2, y2=m.y+m.h/2;
-    octx.strokeStyle = `rgba(${fg},${.2+e*.3})`;
-    octx.beginPath(); octx.moveTo(x1,y1); octx.quadraticCurveTo((x1+x2)/2-(y2-y1)*.2,(y1+y2)/2+(x2-x1)*.2,x2,y2); octx.stroke();
-  }));
-  objs.forEach(o => {
-    const L = Math.min(o.w,o.h)*.22, cx = o.x+o.w/2, cy = o.y+o.h/2;
-    octx.strokeStyle = `rgba(${fg},.9)`;
-    octx.beginPath();                                                                     // 四角括弧
-    [[o.x,o.y,1,1],[o.x+o.w,o.y,-1,1],[o.x,o.y+o.h,1,-1],[o.x+o.w,o.y+o.h,-1,-1]].forEach(([x,y,sx,sy]) => {
-      octx.moveTo(x+sx*L,y); octx.lineTo(x,y); octx.lineTo(x,y+sy*L);
+  octx.font = `${fs}px ui-monospace,Menlo,monospace`; octx.textBaseline = 'top'; octx.lineWidth = .8;
+  const cap = 8 + (e*16 + on*10)|0;
+  objs.forEach((o,oi) => {
+    o.gap = objGap(o);
+    if (!o.nodes || objFrame % 3 === 0) o.nodes = snapNodes(o, o.gap, cap);
+    const nd = o.nodes; if (nd.length < 2) return;
+    // 貼合形狀的細外緣（節點的凸包）
+    if (nd.length >= 3){
+      const h = convexHull(nd); octx.strokeStyle = `rgba(${fg},.3)`; octx.beginPath();
+      h.forEach((q,i) => i ? octx.lineTo(q.x,q.y) : octx.moveTo(q.x,q.y)); octx.closePath(); octx.stroke();
+    }
+    // 每個節點連最近的兩個
+    nd.forEach(n => {
+      nd.filter(m=>m!==n).sort((a,b)=>Math.hypot(a.x-n.x,a.y-n.y)-Math.hypot(b.x-n.x,b.y-n.y)).slice(0,2).forEach(m => {
+        octx.strokeStyle = `rgba(${fg},${.2+e*.3})`; octx.beginPath(); octx.moveTo(n.x,n.y);
+        octx.quadraticCurveTo((n.x+m.x)/2-(m.y-n.y)*.15,(n.y+m.y)/2+(m.x-n.x)*.15,m.x,m.y); octx.stroke();
+      });
     });
-    octx.stroke();
-    octx.fillStyle = `rgba(${acc},.95)`; octx.fillRect(o.x-1,o.y-1,5,5);                  // 紅色標記
+    nd.forEach((n,i) => {
+      const lab = i < 4, w = lab ? 9 : 5, hh = lab ? 5 : 3.5;
+      octx.strokeStyle = `rgba(${fg},.9)`; octx.strokeRect(n.x-w/2,n.y-hh/2,w,hh);
+      octx.fillStyle = `rgba(${acc},.95)`; octx.fillRect(n.x-w/2,n.y-hh/2,lab?3:2,hh);
+      if (!lab) return;
+      octx.fillStyle = `rgba(${fg},.85)`;
+      const f = state.freq ? (state.freq*10+o.id*7+i).toFixed(1) : (16000+o.id*7+i).toFixed(1);
+      octx.fillText(POOL[(o.id+i)%POOL.length], n.x+w/2+3, n.y-fs);
+      octx.fillText(`${f}  e=${e.toFixed(2)}`, n.x+w/2+3, n.y);
+    });
+    const top = nd.reduce((a,b)=>b.y<a.y?b:a);                                            // 名稱掛在最高的節點上
+    octx.fillStyle = `rgba(${acc},.95)`; octx.fillText(`${o.name}${ZH[o.name]?' '+ZH[o.name]:''} ${o.score*100|0}%`, top.x+6, top.y-fs*2.3);
     if (on > .05){                                                                         // 擊缽漣漪
       octx.strokeStyle = `rgba(${acc},${Math.min(1,on)*.6})`;
-      octx.beginPath(); octx.arc(cx,cy,Math.max(o.w,o.h)*(.5+(1-on)*.9),0,Math.PI*2); octx.stroke();
+      octx.beginPath(); octx.arc(o.x+o.w/2,o.y+o.h/2,Math.max(o.w,o.h)*(.4+(1-on)*.7),0,Math.PI*2); octx.stroke();
     }
-    octx.fillStyle = `rgba(${fg},.9)`;
-    octx.fillText(`${o.name}${ZH[o.name]?' '+ZH[o.name]:''}  ${o.score*100|0}%`, o.x+7, o.y-fs-3);
-    const f = state.freq ? (state.freq*10+o.id).toFixed(1) : (16000+o.id).toFixed(1);
-    octx.fillStyle = `rgba(${fg},.7)`; octx.fillText(`${f}  e=${e.toFixed(2)}`, o.x+7, o.y+o.h+3);
   });
 }
 
-// 物件中心的霧狀墨暈（畫在主畫布，會隨殘影擴散）
+// 墨只落在物件的節點上（貼著形狀），不再大片暈開
 function objectInk(baseT){
   const e = state.energy, on = state.onset;
-  objs.forEach((o,i) => {
-    const r = Math.max(o.w,o.h);
-    stamp(o.x+o.w/2, o.y+o.h/2, r*(.9+e*.8+on*.9), r*(.6+e*.5+on*.7), Math.sin(T*.3+i)*.6, Math.min(1,baseT+i*.07), Math.min(paper?.26:.12, .03+e*.14+on*.14));
+  objs.forEach((o,oi) => (o.nodes||[]).forEach((n,i) => {
+    const g = o.gap || 14;
+    stamp(n.x, n.y, g*(2+e*2+on*2), g*(1.2+e*1.2+on), hash(oi*31+i)*3.14+T*.1, Math.min(1,baseT+i*.02), Math.min(paper?.3:.16, .05+e*.2+on*.2));
+  }));
+}
+
+/* ---------------- 手部關鍵點 Hand landmarks ----------------
+   與物件偵測一起載入。21 個關節貼合手形：骨架細線 + 關節方框 + 指尖弧線；
+   墨沿骨架落下（粗細與濃度隨聲音）。不畫外緣輪廓線。 */
+const HAND_MODEL = 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
+let handLm = null, hands = [], handsSeen = 0, handLastVT = -1, handTs = 0;
+const BONES = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[9,10],[10,11],[11,12],[13,14],[14,15],[15,16],[17,18],[18,19],[19,20],[5,9],[9,13],[13,17],[0,17]];
+const TIPS = [4,8,12,16,20], LABELED = [0,4,8,12,16,20,5,9,13,17];
+
+function detectHands(now){
+  if (!handLm || !camVid || camVid.readyState < 2 || camVid.currentTime === handLastVT) return;
+  handLastVT = camVid.currentTime; handTs = Math.max(handTs+1, now);
+  let res; try{ res = handLm.detectForVideo(camVid, handTs); }catch(e){ return; }
+  const vw = camVid.videoWidth, vh = camVid.videoHeight, sc = Math.max(W/vw, H/vh), ox = (W-vw*sc)/2, oy = (H-vh*sc)/2;
+  if (!res.landmarks.length){ if (now - handsSeen > 250) hands = []; return; }
+  handsSeen = now;
+  const next = res.landmarks.map(lm => lm.map(q => { const px = q.x*vw*sc+ox; return {x: camMirror ? W-px : px, y: q.y*vh*sc+oy}; }));
+  hands = next.map(h => {
+    let best = null, bd = W*.3;
+    hands.forEach(o => { const d = Math.hypot(o[0].x-h[0].x, o[0].y-h[0].y); if (d < bd){ bd = d; best = o; } });
+    return best ? h.map((q,i) => ({x: best[i].x+(q.x-best[i].x)*.6, y: best[i].y+(q.y-best[i].y)*.6})) : h;
   });
+}
+const handSize = h => Math.hypot(h[0].x-h[9].x, h[0].y-h[9].y) || 60;
+
+function drawHands(now){
+  detectHands(now);
+  if (!hands.length) return;
+  const fg = paper ? '22,18,12' : '243,238,226', acc = '212,69,46', e = state.energy, on = state.onset;
+  const fs = Math.max(8, Math.min(W,H)*.012);
+  octx.font = `${fs}px ui-monospace,Menlo,monospace`; octx.textBaseline = 'top'; octx.lineWidth = .8;
+  const arc = (a,b,al,bend) => {
+    octx.strokeStyle = `rgba(${fg},${al})`; octx.beginPath(); octx.moveTo(a.x,a.y);
+    octx.quadraticCurveTo((a.x+b.x)/2-(b.y-a.y)*bend,(a.y+b.y)/2+(b.x-a.x)*bend,b.x,b.y); octx.stroke();
+  };
+  hands.forEach((h,hi) => {
+    const size = handSize(h);
+    BONES.forEach(([a,b]) => arc(h[a],h[b],.5,0));
+    TIPS.forEach((t,k) => { arc(h[t],h[0],.2+e*.3,.22); if (k<4) arc(h[t],h[TIPS[k+1]],.2+e*.3,-.3); });
+    if (on > .05){ const c = h[9]; octx.strokeStyle = `rgba(${acc},${Math.min(1,on)*.7})`; octx.beginPath(); octx.arc(c.x,c.y,size*(.8+(1-on)*1.6),0,Math.PI*2); octx.stroke(); }
+    h.forEach((q,i) => {
+      const lab = LABELED.includes(i), w = lab ? 11 : 5, hh = lab ? 6 : 3.5;
+      octx.strokeStyle = `rgba(${fg},.9)`; octx.strokeRect(q.x-w/2,q.y-hh/2,w,hh);
+      octx.fillStyle = `rgba(${acc},.95)`; octx.fillRect(q.x-w/2,q.y-hh/2,lab?3:2,hh);
+      if (!lab) return;
+      octx.fillStyle = `rgba(${fg},.88)`;
+      const f = state.freq ? (state.freq*10+i+hi*21).toFixed(1) : (16000+i+hi*21).toFixed(1);
+      octx.fillText(POOL[i%POOL.length], q.x+w/2+3, q.y-fs);
+      octx.fillText(`${f}  e=${e.toFixed(2)}`, q.x+w/2+3, q.y);
+    });
+  });
+  if (hands.length === 2) TIPS.forEach(t => arc(hands[0][t],hands[1][t],.22+e*.3,.25));
+}
+
+// 墨沿著骨架落下：每段骨頭一團細長的霧
+function handInk(baseT){
+  const e = state.energy, on = state.onset;
+  hands.forEach(h => BONES.forEach(([a,b],i) => {
+    const A = h[a], B = h[b], len = Math.hypot(B.x-A.x,B.y-A.y);
+    stamp((A.x+B.x)/2, (A.y+B.y)/2, len*1.5, 8+e*22+on*18, Math.atan2(B.y-A.y,B.x-A.x), Math.min(1,baseT+i*.015), Math.min(paper?.3:.16, .05+e*.2+on*.2));
+  }));
 }
 
 buildSprites();
@@ -693,8 +823,8 @@ $('bTheme').onclick = () => {
 $('bObj').onclick = () => {
   if (!camStream){ say('物件追蹤需要先開啟鏡頭'); return; }
   objOn = !objOn; $('bObj').classList.toggle('on', objOn);
-  if (objOn) loadObjects().then(()=>{ if (objDet) $('bObj').textContent = '物件追蹤中'; });
-  else { objs = []; $('bObj').textContent = '物件追蹤'; }
+  if (objOn) loadObjects().then(()=>{ if (objDet || handLm) $('bObj').textContent = '物件追蹤中'; });
+  else { objs = []; hands = []; $('bObj').textContent = '物件追蹤'; }
 };
 function composeExport(){
   if (ex.width !== cv.width) { ex.width = cv.width; ex.height = cv.height; }
@@ -715,10 +845,20 @@ function pickMime(){
   return '';
 }
 function stopRec(){
+  $('bGo').classList.remove('on'); $('bGo').textContent = '一鍵創作';
   if (rec && rec.state !== 'inactive') rec.stop();
   clearInterval(recTimer);
   $('bRec').classList.remove('on'); $('bRec').textContent = '錄影';
 }
+// 一鍵創作：麥克風 + 鏡頭 + 物件/手部追蹤 + 錄影（含聲音軌），再按一次停止並下載
+$('bGo').onclick = async () => {
+  if (rec && rec.state === 'recording') return stopRec();
+  if (!micStream) await toggleMic();
+  if (!camStream) await toggleCam();
+  if (camStream && !objOn) $('bObj').click();
+  $('bRec').click();
+  if (rec && rec.state === 'recording'){ $('bGo').classList.add('on'); $('bGo').textContent = '停止創作'; }
+};
 $('bRec').onclick = () => {
   if (rec && rec.state === 'recording') return stopRec();
   try{
@@ -756,7 +896,7 @@ $('bSave').onclick = () => {
 };
 
 // 供自動化測試使用
-window.__soundInk = { get objs(){return objs;}, get dim(){return dimV;}, strike, state, get mode(){return mode;} };
+window.__soundInk = { get objs(){return objs;}, get hands(){return hands;}, strike, state, get mode(){return mode;} };
 })();
 </script>
 </body>
