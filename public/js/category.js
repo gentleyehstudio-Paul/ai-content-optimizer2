@@ -1,5 +1,11 @@
 const SLUG_TO_TABLE = { places: 'venues', teachers: 'facilitators', herbs: 'herbals', food: 'ingredients' };
 
+const PORTALY_LABELS = {
+  A: '課程教學類', B: '身體調理類', C: '空間能量類', D: '心靈茶飲類',
+  E: '商品販售類', F: '個案諮詢類', G: '頌缽療育類', H: '瑜伽教室類',
+  I: '場地租借類', J: '其他類',
+};
+
 const CATEGORIES = {
   venues: { zh: '場地', en: 'VENUE', label: '01 — 場地', subtitle: 'Healing spaces across the island', descKey: 'description', secondaryKey: 'location', hero: '/assets/images/venue-pool.jpg', defaultImg: '/assets/images/venue-zen.jpg' },
   facilitators: { zh: '師資', en: 'FACILITATOR', label: '02 — 師資', subtitle: 'Guides for body and mind', descKey: 'bio', secondaryKey: 'title', hero: '/assets/images/facilitator-meditation.jpg', defaultImg: '/assets/images/facilitator-ceremony.jpg' },
@@ -29,22 +35,26 @@ function extractPrice(item) {
 function getActiveFilters() {
   const region = document.getElementById('filter-region').value;
   const portaly = document.getElementById('filter-portaly').value;
-  const price = document.querySelector('input[name="price"]:checked')?.value || '';
+  const priceEl = document.querySelector('input[name="price"]:checked');
+  const price = priceEl ? priceEl.value : '';
   const keyword = document.getElementById('filter-keyword').value.trim().toLowerCase();
+  const seasonEl = document.getElementById('filter-season');
+  const season = seasonEl ? seasonEl.value : '';
 
   const facilities = [];
   document.querySelectorAll('[data-facility]:checked').forEach(cb => {
     facilities.push(cb.dataset.facility);
   });
 
-  return { region, portaly, price, keyword, facilities };
+  return { region, portaly, price, keyword, facilities, season };
 }
 
 function applyFilters() {
-  const { region, portaly, price, keyword, facilities } = getActiveFilters();
+  const { region, portaly, price, keyword, facilities, season } = getActiveFilters();
 
   const filtered = allItems.filter(item => {
-    if (region && (item.region || '') !== region) return false;
+    const regionKey = (type === 'herbals' || type === 'ingredients') ? 'origin' : 'region';
+    if (region && (item[regionKey] || '') !== region) return false;
     if (portaly && (item.portaly_category || '') !== portaly) return false;
 
     if (price) {
@@ -62,6 +72,8 @@ function applyFilters() {
       ].filter(Boolean).join(' ').toLowerCase();
       if (!searchable.includes(keyword)) return false;
     }
+
+    if (season && (item.season || '') !== season) return false;
 
     for (const fac of facilities) {
       if (!item[fac]) return false;
@@ -112,8 +124,9 @@ function renderGrid(items) {
 
     const badges = [];
     if (item.region) badges.push(item.region);
-    if (item.portaly_category) badges.push(item.portaly_category);
+    if (item.portaly_category) badges.push(PORTALY_LABELS[item.portaly_category] || item.portaly_category);
     if (item.price_info) badges.push(item.price_info);
+    if (item.season) badges.push(item.season);
 
     card.innerHTML = `
       <div class="ys-card-image">
@@ -136,7 +149,9 @@ function renderGrid(items) {
 }
 
 function populateRegionDropdown(items) {
-  const regions = [...new Set(items.map(i => i.region).filter(Boolean))].sort();
+  const useOrigin = type === 'herbals' || type === 'ingredients';
+  const key = useOrigin ? 'origin' : 'region';
+  const regions = [...new Set(items.map(i => i[key]).filter(Boolean))].sort();
   const select = document.getElementById('filter-region');
   regions.forEach(r => {
     const opt = document.createElement('option');
@@ -146,20 +161,38 @@ function populateRegionDropdown(items) {
   });
 }
 
+function populateSeasonDropdown(items) {
+  const seasons = [...new Set(items.map(i => i.season).filter(Boolean))].sort();
+  const select = document.getElementById('filter-season');
+  if (!select || select.style.display === 'none') return;
+  seasons.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s;
+    opt.textContent = s;
+    select.appendChild(opt);
+  });
+}
+
 function resetFilters() {
   document.getElementById('filter-region').value = '';
   document.getElementById('filter-portaly').value = '';
   document.getElementById('filter-keyword').value = '';
-  document.querySelector('input[name="price"][value=""]').checked = true;
+  const priceAll = document.querySelector('input[name="price"][value=""]');
+  if (priceAll) priceAll.checked = true;
+  const seasonEl = document.getElementById('filter-season');
+  if (seasonEl) seasonEl.value = '';
   document.querySelectorAll('[data-facility]').forEach(cb => { cb.checked = false; });
   applyFilters();
 }
 
 function bindEvents() {
   document.getElementById('filter-region').addEventListener('change', applyFilters);
-  document.getElementById('filter-portaly').addEventListener('change', applyFilters);
+  const portalyEl = document.getElementById('filter-portaly');
+  if (portalyEl && portalyEl.style.display !== 'none') portalyEl.addEventListener('change', applyFilters);
   document.querySelectorAll('input[name="price"]').forEach(r => r.addEventListener('change', applyFilters));
   document.querySelectorAll('[data-facility]').forEach(cb => cb.addEventListener('change', applyFilters));
+  const seasonEl = document.getElementById('filter-season');
+  if (seasonEl && seasonEl.style.display !== 'none') seasonEl.addEventListener('change', applyFilters);
 
   let debounce;
   document.getElementById('filter-keyword').addEventListener('input', () => {
@@ -188,6 +221,7 @@ async function load() {
     if (loadingEl) loadingEl.style.display = 'none';
 
     populateRegionDropdown(allItems);
+    populateSeasonDropdown(allItems);
     bindEvents();
     applyFilters();
   } catch (err) {

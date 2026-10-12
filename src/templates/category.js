@@ -1,4 +1,4 @@
-const { renderPage, headerHTML, footerHTML, breadcrumbHTML, esc, TABLE_TO_SLUG } = require('./layout');
+const { renderPage, headerHTML, footerHTML, breadcrumbHTML, esc, TABLE_TO_SLUG, PORTALY_LABELS } = require('./layout');
 
 const CATEGORIES = {
   venues: { zh: '場地', en: 'VENUE', label: '01 — 場地', subtitle: 'Healing spaces across the island', descKey: 'description', secondaryKey: 'location', hero: '/assets/images/venue-pool.jpg', defaultImg: '/assets/images/venue-zen.jpg', seoDesc: '探索台灣各地療癒場地——瑜伽教室、靜心空間、茶室與自然場域，找到適合你的身心安放之所。' },
@@ -19,8 +19,9 @@ function renderCategoryPage(type, items) {
     const imgSrc = item.image_url || cat.defaultImg;
     const badges = [];
     if (item.region) badges.push(item.region);
-    if (item.portaly_category) badges.push(item.portaly_category);
+    if (item.portaly_category) badges.push(PORTALY_LABELS[item.portaly_category] || item.portaly_category);
     if (item.price_info) badges.push(item.price_info);
+    if (item.season) badges.push(item.season);
 
     return `<a class="ys-card ys-in" href="/${esc(slug)}/${item.id}" style="animation-delay:${i * 0.08}s">
       <div class="ys-card-image">
@@ -44,7 +45,7 @@ function renderCategoryPage(type, items) {
   ${headerHTML({ solid: true })}
 
   <div class="ys-page-header ys-page-header--hero">
-    <img id="page-hero-img" class="ys-page-header-img" src="${esc(cat.hero)}" alt="${esc(cat.zh)}">
+    <img id="page-hero-img" class="ys-page-header-img" src="${esc(cat.hero)}" alt="有鬆島${esc(cat.zh)}列表" width="1600" height="600">
     <div class="ys-page-header-overlay"></div>
     <div class="ys-container" style="position:relative;z-index:1">
       <span class="ys-section-label" style="color:rgba(244,241,234,.55)" id="section-label">${esc(cat.label)}</span>
@@ -64,26 +65,26 @@ function renderCategoryPage(type, items) {
         </button>
         <div class="ys-sidebar-body" id="sidebar-body">
           <div class="ys-filter-group">
-            <h3 class="ys-filter-title">地區</h3>
-            <select id="filter-region" class="ys-filter-select"><option value="">全部地區</option></select>
+            <h3 class="ys-filter-title">${type === 'herbals' || type === 'ingredients' ? '產地' : '地區'}</h3>
+            <select id="filter-region" class="ys-filter-select"><option value="">${type === 'herbals' || type === 'ingredients' ? '全部產地' : '全部地區'}</option></select>
           </div>
-          <div class="ys-filter-group">
+          ${type === 'venues' || type === 'facilitators' ? `<div class="ys-filter-group">
             <h3 class="ys-filter-title">Portaly 分類</h3>
             <select id="filter-portaly" class="ys-filter-select">
               <option value="">全部分類</option>
-              <option value="A">A. 課程教學類</option>
-              <option value="B">B. 身體調理類</option>
-              <option value="C">C. 空間能量類</option>
-              <option value="D">D. 心靈茶飲類</option>
-              <option value="E">E. 商品販售類</option>
-              <option value="F">F. 個案諮詢類</option>
-              <option value="G">G. 頌缽療育類</option>
-              <option value="H">H. 瑜伽教室類</option>
-              <option value="I">I. 場地租借類</option>
-              <option value="J">J. 其他類</option>
+              <option value="A">課程教學類</option>
+              <option value="B">身體調理類</option>
+              <option value="C">空間能量類</option>
+              <option value="D">心靈茶飲類</option>
+              <option value="E">商品販售類</option>
+              <option value="F">個案諮詢類</option>
+              <option value="G">頌缽療育類</option>
+              <option value="H">瑜伽教室類</option>
+              <option value="I">場地租借類</option>
+              <option value="J">其他類</option>
             </select>
-          </div>
-          <div class="ys-filter-group">
+          </div>` : '<select id="filter-portaly" style="display:none"></select>'}
+          ${type === 'venues' ? `<div class="ys-filter-group">
             <h3 class="ys-filter-title">價格範圍</h3>
             <div class="ys-filter-radios">
               <label class="ys-filter-radio"><input type="radio" name="price" value="" checked><span>不限</span></label>
@@ -91,7 +92,7 @@ function renderCategoryPage(type, items) {
               <label class="ys-filter-radio"><input type="radio" name="price" value="mid"><span>$500 – $2,000</span></label>
               <label class="ys-filter-radio"><input type="radio" name="price" value="high"><span>$2,000 以上</span></label>
             </div>
-          </div>
+          </div>` : '<input type="radio" name="price" value="" checked style="display:none">'}
           ${type === 'venues' ? `<div class="ys-filter-group" id="facilities-group">
             <h3 class="ys-filter-title">場地設施</h3>
             <div class="ys-filter-checks">
@@ -107,6 +108,10 @@ function renderCategoryPage(type, items) {
               <label class="ys-filter-check"><input type="checkbox" data-facility="near_mrt"><span>捷運站步行5分鐘內</span></label>
             </div>
           </div>` : ''}
+          ${type === 'ingredients' ? `<div class="ys-filter-group">
+            <h3 class="ys-filter-title">產季</h3>
+            <select id="filter-season" class="ys-filter-select"><option value="">全部產季</option></select>
+          </div>` : '<select id="filter-season" style="display:none"></select>'}
           <div class="ys-filter-group">
             <h3 class="ys-filter-title">關鍵字搜尋</h3>
             <input type="text" id="filter-keyword" class="ys-filter-input" placeholder="輸入名稱或描述⋯">

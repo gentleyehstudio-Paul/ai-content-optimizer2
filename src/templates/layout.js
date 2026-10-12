@@ -19,6 +19,12 @@ const TABLE_TO_SLUG = {
   ingredients: 'food',
 };
 
+const PORTALY_LABELS = {
+  A: '課程教學類', B: '身體調理類', C: '空間能量類', D: '心靈茶飲類',
+  E: '商品販售類', F: '個案諮詢類', G: '頌缽療育類', H: '瑜伽教室類',
+  I: '場地租借類', J: '其他類',
+};
+
 function esc(str) {
   if (!str) return '';
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -117,4 +123,4 @@ function footerHTML() {
   </footer>`;
 }
 
-module.exports = { renderPage, headerHTML, footerHTML, breadcrumbHTML, esc, SITE_URL, SITE_NAME, SLUG_MAP, TABLE_TO_SLUG };
+module.exports = { renderPage, headerHTML, footerHTML, breadcrumbHTML, esc, SITE_URL, SITE_NAME, SLUG_MAP, TABLE_TO_SLUG, PORTALY_LABELS };

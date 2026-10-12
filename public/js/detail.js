@@ -13,6 +13,12 @@ const META_LABELS = {
   origin: '產地', season: '產季',
 };
 
+const PORTALY_LABELS = {
+  A: '課程教學類', B: '身體調理類', C: '空間能量類', D: '心靈茶飲類',
+  E: '商品販售類', F: '個案諮詢類', G: '頌缽療育類', H: '瑜伽教室類',
+  I: '場地租借類', J: '其他類',
+};
+
 const FACILITY_LABELS = {
   has_mirror: '鏡子', has_wooden_floor: '木地板', has_accessibility: '無障礙空間',
   has_audio_equipment: '音響設備', has_parking: '停車場', has_shower: '淋浴間',
@@ -99,7 +105,7 @@ function renderExtraInfo(item) {
   const infos = [];
   if (item.region) infos.push({ label: '地區', value: item.region });
   if (item.price_info) infos.push({ label: '價格', value: item.price_info });
-  if (item.portaly_category) infos.push({ label: 'Portaly 分類', value: item.portaly_category });
+  if (item.portaly_category) infos.push({ label: 'Portaly 分類', value: PORTALY_LABELS[item.portaly_category] || item.portaly_category });
   if (item.capacity) infos.push({ label: '容納人數', value: `${item.capacity} 人` });
 
   if (infos.length === 0) return;

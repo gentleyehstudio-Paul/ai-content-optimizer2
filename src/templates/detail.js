@@ -1,4 +1,4 @@
-const { renderPage, headerHTML, footerHTML, breadcrumbHTML, esc, TABLE_TO_SLUG } = require('./layout');
+const { renderPage, headerHTML, footerHTML, breadcrumbHTML, esc, TABLE_TO_SLUG, PORTALY_LABELS, SITE_URL } = require('./layout');
 
 const CATEGORIES = {
   venues: { zh: '場地', en: 'VENUE', label: '場地', descKey: 'description', metaFields: ['location', 'address'], defaultImg: '/assets/images/venue-zen.jpg' },
@@ -48,7 +48,7 @@ function renderDetailPage(type, item, relatedItems) {
   const infos = [];
   if (item.region) infos.push({ label: '地區', value: item.region });
   if (item.price_info) infos.push({ label: '價格', value: item.price_info });
-  if (item.portaly_category) infos.push({ label: 'Portaly 分類', value: item.portaly_category });
+  if (item.portaly_category) infos.push({ label: 'Portaly 分類', value: PORTALY_LABELS[item.portaly_category] || item.portaly_category });
   if (item.capacity) infos.push({ label: '容納人數', value: `${item.capacity} 人` });
 
   const infoHTML = infos.length > 0 ? `
@@ -100,14 +100,47 @@ function renderDetailPage(type, item, relatedItems) {
     </section>`;
   }
 
-  const jsonLd = {
-    '@context': 'https://schema.org',
-    '@type': type === 'venues' ? 'Place' : type === 'facilitators' ? 'Person' : 'Product',
-    name: item.name,
-    description: desc.slice(0, 200),
-    image: imgSrc.startsWith('http') ? imgSrc : undefined,
-  };
-  if (type === 'venues' && item.address) jsonLd.address = item.address;
+  const jsonLd = { '@context': 'https://schema.org' };
+  const fullUrl = `${SITE_URL}/${slug}/${item.id}`;
+
+  if (type === 'venues') {
+    jsonLd['@type'] = 'LocalBusiness';
+    jsonLd.name = item.name;
+    jsonLd.description = desc.slice(0, 200);
+    if (imgSrc.startsWith('http')) jsonLd.image = imgSrc;
+    jsonLd.url = fullUrl;
+    if (item.address) {
+      jsonLd.address = { '@type': 'PostalAddress', streetAddress: item.address };
+      if (item.region) jsonLd.address.addressRegion = item.region;
+      jsonLd.address.addressCountry = 'TW';
+    }
+    if (item.latitude && item.longitude) {
+      jsonLd.geo = { '@type': 'GeoCoordinates', latitude: item.latitude, longitude: item.longitude };
+    }
+    if (item.contact) jsonLd.telephone = item.contact;
+    if (item.price_info) jsonLd.priceRange = item.price_info;
+    if (item.capacity) jsonLd.maximumAttendeeCapacity = item.capacity;
+  } else if (type === 'facilitators') {
+    jsonLd['@type'] = 'Person';
+    jsonLd.name = item.name;
+    jsonLd.description = desc.slice(0, 200);
+    if (imgSrc.startsWith('http')) jsonLd.image = imgSrc;
+    jsonLd.url = fullUrl;
+    if (item.title) jsonLd.jobTitle = item.title;
+    const specialties = item.specialties || item.tags || [];
+    if (specialties.length > 0) jsonLd.knowsAbout = specialties;
+    if (item.website) jsonLd.sameAs = [item.website];
+  } else {
+    jsonLd['@type'] = 'Product';
+    jsonLd.name = item.name;
+    jsonLd.description = desc.slice(0, 200);
+    if (imgSrc.startsWith('http')) jsonLd.image = imgSrc;
+    jsonLd.url = fullUrl;
+    jsonLd.brand = { '@type': 'Brand', name: '有鬆島' };
+    if (item.origin) jsonLd.countryOfOrigin = { '@type': 'Country', name: item.origin };
+    if (type === 'ingredients' && item.season) jsonLd.additionalProperty = [{ '@type': 'PropertyValue', name: '產季', value: item.season }];
+    if (item.portaly_category) jsonLd.category = PORTALY_LABELS[item.portaly_category] || item.portaly_category;
+  }
 
   const body = `
   ${headerHTML({ solid: true })}
@@ -123,7 +156,7 @@ function renderDetailPage(type, item, relatedItems) {
     </div>
 
     <div class="ys-detail-hero">
-      <img id="hero-img" src="${esc(imgSrc)}" alt="${esc(item.name)}">
+      <img id="hero-img" src="${esc(imgSrc)}" alt="${esc(item.name)}" width="1200" height="600">
       <div class="ys-detail-hero-overlay"></div>
       <div class="ys-detail-hero-content">
         <span class="ys-section-label" style="color:rgba(244,241,234,.55)" id="detail-label">${esc(cat.label)}</span>

@@ -56,8 +56,73 @@ function partnersPage() {
       </ul>
       <h2>合作方式</h2>
       <p>有鬆島為合作夥伴提供免費的線上曝光，包含獨立介紹頁面、篩選功能與聯繫管道。我們不收取上架費用，也不抽取佣金。</p>
-      <h2>加入方式</h2>
-      <p>請來信 <a href="mailto:gentleyehstudio@gmail.com?subject=有鬆島合作提案">gentleyehstudio@gmail.com</a>，告訴我們你在做的事，我們會盡快回覆。</p>
+      <h2>提出合作</h2>
+      <form id="partner-form" class="ys-contact-form">
+        <div class="ys-form-group">
+          <label for="contact-name">姓名 / 品牌名稱 <span class="ys-required">*</span></label>
+          <input type="text" id="contact-name" name="name" required placeholder="您的名字或品牌名稱">
+        </div>
+        <div class="ys-form-group">
+          <label for="contact-email">Email <span class="ys-required">*</span></label>
+          <input type="email" id="contact-email" name="email" required placeholder="your@email.com">
+        </div>
+        <div class="ys-form-group">
+          <label for="contact-type">合作類型</label>
+          <select id="contact-type" name="type">
+            <option value="">請選擇</option>
+            <option value="venue">場域主人</option>
+            <option value="facilitator">療癒師</option>
+            <option value="herbal">草本農家</option>
+            <option value="ingredient">友善小農</option>
+            <option value="other">其他</option>
+          </select>
+        </div>
+        <div class="ys-form-group">
+          <label for="contact-message">簡述您的療癒事業 <span class="ys-required">*</span></label>
+          <textarea id="contact-message" name="message" required rows="5" placeholder="告訴我們您在做的事⋯"></textarea>
+        </div>
+        <button type="submit" class="ys-btn ys-btn--solid" style="border:none;cursor:pointer">送出合作提案</button>
+        <div id="form-status" class="ys-form-status" style="display:none"></div>
+      </form>
+      <p style="margin-top:24px;font-size:13px;color:var(--muted)">或直接來信 <a href="mailto:gentleyehstudio@gmail.com">gentleyehstudio@gmail.com</a></p>
+      <script>
+      document.getElementById('partner-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const btn = this.querySelector('button[type="submit"]');
+        const status = document.getElementById('form-status');
+        btn.disabled = true;
+        btn.textContent = '送出中⋯';
+        status.style.display = 'none';
+        try {
+          const res = await fetch('/api/contact', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: document.getElementById('contact-name').value,
+              email: document.getElementById('contact-email').value,
+              type: document.getElementById('contact-type').value,
+              message: document.getElementById('contact-message').value,
+            }),
+          });
+          const data = await res.json();
+          if (res.ok) {
+            status.textContent = '感謝您的提案！我們會盡快回覆。';
+            status.className = 'ys-form-status ys-form-success';
+            status.style.display = 'block';
+            this.reset();
+          } else {
+            throw new Error(data.error || '送出失敗');
+          }
+        } catch (err) {
+          status.textContent = err.message || '送出失敗，請稍後再試。';
+          status.className = 'ys-form-status ys-form-error';
+          status.style.display = 'block';
+        } finally {
+          btn.disabled = false;
+          btn.textContent = '送出合作提案';
+        }
+      });
+      </script>
     `,
   });
 }

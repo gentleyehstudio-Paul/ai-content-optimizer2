@@ -11,7 +11,8 @@
     "scrape": "node src/scraper/scheduler.js",
     "import:portaly": "node src/scraper/import-portaly.js",
     "db:migrate": "node db/run-migrate.js",
-    "data:cleanup": "node src/scripts/data-cleanup.js"
+    "data:cleanup": "node src/scripts/data-cleanup.js",
+    "db:contact": "node src/scripts/create-contact-table.js"
   },
   "engines": {
     "node": ">=18.0.0"
