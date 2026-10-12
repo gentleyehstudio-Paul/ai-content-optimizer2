@@ -69,6 +69,7 @@
   <button data-mode="harmonic">共鳴</button>
   <span class="sep"></span>
   <button id="bTheme">宣紙</button>
+  <button id="bHand">手部追蹤</button>
   <button id="bTag">標註</button>
   <button id="bRec">錄影</button>
   <button id="bFreeze">凍結</button>
@@ -322,6 +323,7 @@ function step(now){
   }
 
   if (camStream) camStrokes(baseT);
+  if (handsOn) handInk(baseT);
   if (mode==='harmonic' || state.peaks.length>=2) rings(baseT);
   ctx.globalCompositeOperation = 'source-over';
 }
@@ -385,7 +387,8 @@ function setupCam(){
 }
 async function toggleCam(){
   if (camStream){
-    camStream.getTracks().forEach(t=>t.stop()); camStream = null;
+    camStream.getTracks().forEach(t=>t.stop()); camStream = null; hands = []; handsOn = false;
+    $('bHand').classList.remove('on'); $('bHand').textContent = '手部追蹤';
     $('bCam').classList.remove('on'); $('bCam').textContent = '開啟鏡頭'; return;
   }
   try{
@@ -476,7 +479,9 @@ function updateNodes(){
 
 function drawTags(baseT){
   octx.clearRect(0,0,W,H);
-  if (!camStream || !tagsOn) return;
+  if (!camStream) return;
+  if (handsOn && drawHands(performance.now())) return;   // 有偵測到手時，標註貼合手部；否則退回動態節點
+  if (!tagsOn) return;
   if (tagFrame++ % 4 === 0) updateNodes();
   const fs = Math.max(8, Math.min(W,H)*.012), mx = camMirror;
   const fg = paper ? '22,18,12' : '243,238,226', acc = '212,69,46';
@@ -501,6 +506,119 @@ function drawTags(baseT){
     const f = state.freq ? (state.freq*10+n.id).toFixed(1) : (16000+n.id).toFixed(1);
     octx.fillText(`${f}  e=${state.energy.toFixed(2)}`, x+n.w/2+3, y);
   });
+}
+
+
+/* ---------------- 手部關鍵點 Hand landmarks ----------------
+   MediaPipe HandLandmarker 偵測 21 個關節（首次開啟才下載模型，約 8MB）。
+   標註貼合手部：輪廓描邊、骨架、關節方框標籤、指尖間弧線；
+   指尖在墨層留下筆跡，粗細與濃度由聲音決定；擊缽時掌心擴散一圈漣漪。 */
+const MP_BASE = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
+const HAND_MODEL = 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
+let handsOn = false, handLm = null, handLoading = false, hands = [], handsSeen = 0, lastVT = -1, handTs = 0;
+const tipPrev = {};
+const BONES = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[9,10],[10,11],[11,12],[13,14],[14,15],[15,16],[17,18],[18,19],[19,20],[5,9],[9,13],[13,17],[0,17]];
+const PALM = [0,1,5,9,13,17], TIPS = [4,8,12,16,20], LABELED = [0,4,8,12,16,20,5,9,13,17];
+
+async function loadHands(){
+  if (handLm || handLoading) return;
+  handLoading = true; $('bHand').textContent = '載入模型…';
+  try{
+    const mod = await import(MP_BASE + '/vision_bundle.mjs');
+    const fileset = await mod.FilesetResolver.forVisionTasks(MP_BASE + '/wasm');
+    const opts = delegate => ({baseOptions:{modelAssetPath:HAND_MODEL, delegate}, runningMode:'VIDEO', numHands:2});
+    try{ handLm = await mod.HandLandmarker.createFromOptions(fileset, opts('GPU')); }
+    catch(_){ handLm = await mod.HandLandmarker.createFromOptions(fileset, opts('CPU')); }
+    $('bHand').textContent = '手部追蹤中';
+  }catch(e){
+    handsOn = false; $('bHand').classList.remove('on'); $('bHand').textContent = '手部追蹤';
+    say('手部模型載入失敗：' + (e.message||e)); console.error(e);
+  }
+  handLoading = false;
+}
+
+function detectHands(now){
+  if (!handLm || !camVid || camVid.readyState < 2 || camVid.currentTime === lastVT) return;
+  lastVT = camVid.currentTime;
+  handTs = Math.max(handTs+1, now);
+  let res; try{ res = handLm.detectForVideo(camVid, handTs); }catch(e){ return; }
+  const vw = camVid.videoWidth, vh = camVid.videoHeight, sc = Math.max(W/vw, H/vh), ox = (W-vw*sc)/2, oy = (H-vh*sc)/2;
+  if (!res.landmarks.length){ if (now - handsSeen > 250) hands = []; return; }
+  handsSeen = now;
+  const next = res.landmarks.map(lm => lm.map(q => { const px = q.x*vw*sc+ox; return {x: camMirror ? W-px : px, y: q.y*vh*sc+oy}; }));
+  // 與上一幀最近的手配對並平滑，減少抖動
+  hands = next.map(h => {
+    let best = null, bd = W*.3;
+    hands.forEach(o => { const d = Math.hypot(o[0].x-h[0].x, o[0].y-h[0].y); if (d < bd){ bd = d; best = o; } });
+    return best ? h.map((q,i) => ({x: best[i].x+(q.x-best[i].x)*.6, y: best[i].y+(q.y-best[i].y)*.6})) : h;
+  });
+}
+
+function handSize(h){ return Math.hypot(h[0].x-h[9].x, h[0].y-h[9].y) || 60; }
+
+// 貼合輪廓：所有骨頭與手掌畫成一條粗圓角路徑，再挖掉內部，只留 1px 外緣
+function handOutline(h, fg, alpha){
+  const T = handSize(h)*.21;
+  const path = () => {
+    octx.beginPath();
+    BONES.forEach(([a,b]) => { octx.moveTo(h[a].x,h[a].y); octx.lineTo(h[b].x,h[b].y); });
+    octx.moveTo(h[PALM[0]].x,h[PALM[0]].y); PALM.slice(1).forEach(i => octx.lineTo(h[i].x,h[i].y)); octx.closePath();
+  };
+  octx.lineCap = octx.lineJoin = 'round';
+  octx.strokeStyle = `rgba(${fg},${alpha})`; octx.fillStyle = `rgba(${fg},${alpha})`;
+  octx.lineWidth = T+4; path(); octx.stroke(); octx.fill();
+  octx.globalCompositeOperation = 'destination-out';   // 擦除量取決於來源 alpha，必須用不透明色
+  octx.strokeStyle = octx.fillStyle = '#000';
+  octx.lineWidth = T; path(); octx.stroke(); octx.fill();
+  octx.globalCompositeOperation = 'source-over';
+}
+
+function drawHands(now){
+  detectHands(now);
+  if (!hands.length) return false;
+  const fg = paper ? '22,18,12' : '243,238,226', acc = '212,69,46', e = state.energy, on = state.onset;
+  const fs = Math.max(8, Math.min(W,H)*.012);
+  hands.forEach(h => handOutline(h, fg, .75+e*.25));
+  octx.font = `${fs}px ui-monospace,Menlo,monospace`; octx.textBaseline = 'top'; octx.lineWidth = .7;
+  const arc = (a,b,al,bend=.18) => {
+    const cx=(a.x+b.x)/2-(b.y-a.y)*bend, cy=(a.y+b.y)/2+(b.x-a.x)*bend;
+    octx.strokeStyle = `rgba(${fg},${al})`; octx.beginPath(); octx.moveTo(a.x,a.y); octx.quadraticCurveTo(cx,cy,b.x,b.y); octx.stroke();
+  };
+  hands.forEach((h,hi) => {
+    const size = handSize(h);
+    BONES.forEach(([a,b]) => arc(h[a],h[b],.35,0));
+    TIPS.forEach((t,k) => { arc(h[t],h[0],.2+e*.3,.22); if (k<4) arc(h[t],h[TIPS[k+1]],.2+e*.3,-.3); });   // 網絡弧線
+    if (on > .05){                                                                                         // 擊缽漣漪
+      const c = h[9]; octx.strokeStyle = `rgba(${acc},${Math.min(1,on)*.7})`;
+      octx.beginPath(); octx.arc(c.x,c.y,size*(.8+(1-on)*1.6),0,Math.PI*2); octx.stroke();
+    }
+    h.forEach((q,i) => {
+      const lab = LABELED.includes(i), w = lab ? 11 : 5, hh = lab ? 6 : 3.5;
+      octx.strokeStyle = `rgba(${fg},.9)`; octx.strokeRect(q.x-w/2,q.y-hh/2,w,hh);
+      octx.fillStyle = `rgba(${acc},.95)`; octx.fillRect(q.x-w/2,q.y-hh/2,lab?3:2,hh);
+      if (!lab) return;
+      octx.fillStyle = `rgba(${fg},.88)`;
+      const f = state.freq ? (state.freq*10+i+hi*21).toFixed(1) : (16000+i+hi*21).toFixed(1);
+      octx.fillText(POOL[i%POOL.length], q.x+w/2+3, q.y-fs);
+      octx.fillText(`${f}  e=${e.toFixed(2)}`, q.x+w/2+3, q.y);
+    });
+  });
+  if (hands.length === 2) TIPS.forEach(t => arc(hands[0][t],hands[1][t],.22+e*.3,.25));                    // 兩手指尖互連
+  return true;
+}
+
+// 指尖在墨層留下筆跡（畫在主畫布，會隨殘影暈開）
+function handInk(baseT){
+  const e = state.energy, on = state.onset;
+  hands.forEach((h,hi) => TIPS.forEach((t,k) => {
+    const key = hi*5+k, q = h[t], pv = tipPrev[key]; tipPrev[key] = {x:q.x,y:q.y};
+    if (!pv) return;
+    const sp = Math.hypot(q.x-pv.x,q.y-pv.y); if (sp > W*.2) return;
+    ctx.strokeStyle = inkColor(Math.min(1,baseT+k*.04), Math.min(.9,.3+e*.5+on*.3), on>.4?20:0);
+    ctx.lineWidth = 1+Math.min(4,sp*.15)+e*3+on*3; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(pv.x,pv.y); ctx.lineTo(q.x,q.y); ctx.stroke();
+  }));
+  if (!hands.length) for (const k in tipPrev) delete tipPrev[k];
 }
 
 /* ---------------- Loop & UI ---------------- */
@@ -556,6 +674,12 @@ $('bTheme').onclick = () => {
   paintBg(1);
 };
 
+$('bHand').onclick = () => {
+  if (!camStream){ say('手部追蹤需要先開啟鏡頭'); return; }
+  handsOn = !handsOn; $('bHand').classList.toggle('on', handsOn);
+  if (handsOn) loadHands().then(()=>{ if (handLm) $('bHand').textContent = '手部追蹤中'; });
+  else { hands = []; $('bHand').textContent = '手部追蹤'; }
+};
 function composeExport(){
   if (ex.width !== cv.width) { ex.width = cv.width; ex.height = cv.height; }
   ectx.setTransform(1,0,0,1,0,0);
@@ -616,7 +740,7 @@ $('bSave').onclick = () => {
 };
 
 // 供自動化測試使用
-window.__soundInk = { strike, state, get mode(){return mode;} };
+window.__soundInk = { get hands(){return hands;}, strike, state, get mode(){return mode;} };
 })();
 </script>
 </body>
