@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: yousong-island
+    runtime: node
+    repo: https://github.com/gentleyehstudio-Paul/ai-content-optimizer2
+    branch: claude/yousong-island-dev-v33ey7
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: LINE_NOTIFY_TOKEN
+        sync: false
+      - key: SENDGRID_API_KEY
+        sync: false
+      - key: SENDGRID_FROM_EMAIL
+        sync: false
+      - key: SENDGRID_ADMIN_EMAIL
+        sync: false
