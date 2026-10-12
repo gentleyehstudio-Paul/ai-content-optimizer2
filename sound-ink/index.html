@@ -275,15 +275,19 @@ function field(x,y,t){
 }
 
 let T = 0, burstQueue = 0, frozen = false;
+// 追蹤到物件時，背景（粒子流、諧波環、鏡頭墨痕）漸漸淡出，讓物件框與標籤突顯；物件消失後緩緩回復
+let dimV = 0, bgK = 1;
 
 function step(now){
   const dt = 1;
+  dimV += ((objOn && objs.length ? 1 : 0) - dimV) * .08;
+  bgK = 1 - .85*dimV;
   T += .016;
   const e = state.energy;
   // 殘影：能量越低，墨保留越久（冥想時像濕墨緩慢暈開）
   const fade = mode==='meditation' ? .035 : mode==='flow' ? .05 : .07;
   ctx.globalCompositeOperation = 'source-over';
-  paintBg(paper ? .14 : fade); // 8-bit 取整會讓小 alpha 留下殘影，宣紙需較大淡出量
+  paintBg(paper ? .14 : fade + dimV*.04);   // 淡出時加快殘影消退 // 8-bit 取整會讓小 alpha 留下殘影，宣紙需較大淡出量
 
   const baseT = state.hue;
   const speed = mode==='meditation' ? .35 : mode==='flow' ? .9 : mode==='pulse' ? 1.2 : .6;
@@ -316,7 +320,7 @@ function step(now){
 
     const lf = p.life/p.max, fadeIO = Math.min(1, lf*6)*(1-lf);
     const t = Math.min(1, Math.max(0, baseT + (p.seed-.5)*.35 + (p.burst?.1:0)));
-    const alpha = fadeIO * (p.burst ? .55 : .28 + e*.5);
+    const alpha = fadeIO * (p.burst ? .55 : .28 + e*.5) * bgK;
     ctx.strokeStyle = inkColor(t, alpha, p.burst?25:0);
     ctx.lineWidth = p.w * 1.6 * (p.burst ? (1-lf*.6) : 1) * (1 + e*1.5);
     ctx.beginPath(); ctx.moveTo(p.px,p.py); ctx.lineTo(p.x,p.y); ctx.stroke();
@@ -349,7 +353,7 @@ function rings(t){
     const rad = R*(.18 + i*.17);
     const amp = p.a*R*.025*(1+state.onset);
     const lobes = 3 + i*2;
-    ctx.strokeStyle = inkColor(Math.min(1, t+.18+i*.05), .10+p.a*.3, 0);
+    ctx.strokeStyle = inkColor(Math.min(1, t+.18+i*.05), .10+p.a*.3, 0).replace(/[\d.]+\)$/, m => (parseFloat(m)*bgK*bgK).toFixed(3)+')');
     ctx.beginPath();
     for (let a=0;a<=Math.PI*2+.05;a+=.05){
       const rr = rad + Math.sin(a*lobes + T*(.6+i*.25))*amp;
@@ -470,7 +474,7 @@ function camStrokes(baseT){
     const tm = Math.hypot(tx,ty)||1, len = lenK*(.5+edge)*a.jl*.5;
     const sx = camMirror ? W-px : px, dx = (camMirror?-1:1)*tx/tm*len, dy = ty/tm*len;
     const tt = Math.min(1,Math.max(0,baseT+(a.jl-1)*.2)), ang = Math.atan2(dy,dx);
-    stamp(sx, py, len*2.2, 3+ink*8*(1+on), ang, tt, Math.min(paper?.26:.12, ink*(paper?.3:.16)));   // 暗場用加法混色，須更淡          // 霧狀墨痕
+    stamp(sx, py, len*2.2, 3+ink*8*(1+on), ang, tt, Math.min(paper?.26:.12, ink*(paper?.3:.16))*(1-.6*dimV));   // 暗場用加法混色，須更淡          // 霧狀墨痕
     if (a.jl > 1.2){                                                                    // 零星墨點
       ctx.fillStyle = inkColor(tt, Math.min(.9, ink*1.2));
       ctx.fillRect(sx+(hash(a.ph*91)-.5)*len*3, py+(hash(a.ph*37)-.5)*len*3, 1.6, 1.6);
@@ -752,7 +756,7 @@ $('bSave').onclick = () => {
 };
 
 // 供自動化測試使用
-window.__soundInk = { get objs(){return objs;}, strike, state, get mode(){return mode;} };
+window.__soundInk = { get objs(){return objs;}, get dim(){return dimV;}, strike, state, get mode(){return mode;} };
 })();
 </script>
 </body>
