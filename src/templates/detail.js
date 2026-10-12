@@ -1,4 +1,4 @@
-const { renderPage, headerHTML, footerHTML, esc } = require('./layout');
+const { renderPage, headerHTML, footerHTML, breadcrumbHTML, esc, TABLE_TO_SLUG } = require('./layout');
 
 const CATEGORIES = {
   venues: { zh: '場地', en: 'VENUE', label: '場地', descKey: 'description', metaFields: ['location', 'address'], defaultImg: '/assets/images/venue-zen.jpg' },
@@ -18,10 +18,11 @@ const FACILITY_LABELS = {
   has_kitchen: '廚房', has_wifi: 'Wi-Fi', has_projector: '投影機', near_mrt: '捷運站步行5分鐘內',
 };
 
-function renderDetailPage(type, item) {
+function renderDetailPage(type, item, relatedItems) {
   const cat = CATEGORIES[type];
   if (!cat || !item) return null;
 
+  const slug = TABLE_TO_SLUG[type];
   const desc = item[cat.descKey] || item.description || item.bio || '';
   const imgSrc = item.image_url || cat.defaultImg;
   const seoDesc = desc.slice(0, 120) || `${item.name}——有鬆島${cat.zh}資源`;
@@ -76,6 +77,29 @@ function renderDetailPage(type, item) {
   const tags = item.tags || item.specialties || [];
   const tagsHTML = tags.length > 0 ? tags.map(tag => `<span class="ys-tag">${esc(tag)}</span>`).join('') : '';
 
+  let relatedHTML = '';
+  if (relatedItems && relatedItems.length > 0) {
+    const relatedCards = relatedItems.map((ri, i) => {
+      const riDesc = ri[cat.descKey] || ri.description || '';
+      const riImg = ri.image_url || cat.defaultImg;
+      return `<a class="ys-card ys-card--small ys-in" href="/${esc(slug)}/${ri.id}" style="animation-delay:${i * 0.08}s">
+        <div class="ys-card-image">
+          <img src="${esc(riImg)}" alt="${esc(ri.name)}" loading="lazy" width="400" height="300">
+        </div>
+        <div class="ys-card-body">
+          <div class="ys-card-title"><span class="ys-card-title-zh">${esc(ri.name)}</span></div>
+          <p class="ys-card-desc">${esc(riDesc.slice(0, 60))}${riDesc.length > 60 ? '⋯' : ''}</p>
+        </div>
+      </a>`;
+    }).join('\n');
+
+    relatedHTML = `
+    <section class="ys-related">
+      <h2>其他${esc(cat.zh)}</h2>
+      <div class="ys-grid ys-grid--related">${relatedCards}</div>
+    </section>`;
+  }
+
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': type === 'venues' ? 'Place' : type === 'facilitators' ? 'Person' : 'Product',
@@ -91,7 +115,12 @@ function renderDetailPage(type, item) {
   <div id="loading" class="ys-loading" style="display:none">載入中⋯</div>
 
   <div id="content">
-    <a id="back-link" class="ys-back-link" href="/category/${esc(type)}">← 返回${esc(cat.zh)}列表</a>
+    <div class="ys-container">
+      ${breadcrumbHTML([
+        { label: cat.zh, href: `/${slug}` },
+        { label: item.name },
+      ])}
+    </div>
 
     <div class="ys-detail-hero">
       <img id="hero-img" src="${esc(imgSrc)}" alt="${esc(item.name)}">
@@ -110,16 +139,19 @@ function renderDetailPage(type, item) {
       ${contactHTML}
       <div id="detail-tags" class="ys-tags">${tagsHTML}</div>
     </div>
+
+    ${relatedHTML}
   </div>
 
   ${footerHTML()}
   <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
+  <script>window.__YS_TYPE="${type}";window.__YS_SLUG="${slug}";</script>
   <script src="/js/detail.js"></script>`;
 
   return renderPage({
     title: item.name,
     description: seoDesc,
-    path: `/detail/${type}/${item.id}`,
+    path: `/${slug}/${item.id}`,
     ogImage: imgSrc.startsWith('http') ? imgSrc : undefined,
     body,
   });

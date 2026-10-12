@@ -1,3 +1,6 @@
+const SLUG_TO_TABLE = { places: 'venues', teachers: 'facilitators', herbs: 'herbals', food: 'ingredients' };
+const TABLE_TO_SLUG = { venues: 'places', facilitators: 'teachers', herbals: 'herbs', ingredients: 'food' };
+
 const CATEGORIES = {
   venues: { zh: '場地', en: 'VENUE', label: '場地', descKey: 'description', metaFields: ['location', 'address'], defaultImg: '/assets/images/venue-zen.jpg' },
   facilitators: { zh: '師資', en: 'FACILITATOR', label: '師資', descKey: 'bio', metaFields: ['title'], defaultImg: '/assets/images/facilitator-ceremony.jpg' },
@@ -17,15 +20,23 @@ const FACILITY_LABELS = {
 };
 
 const parts = window.location.pathname.split('/');
-const type = parts[2] || 'venues';
-const id = parts[3];
+const type = window.__YS_TYPE || (function() {
+  const s = parts[1];
+  return SLUG_TO_TABLE[s] || s || 'venues';
+})();
+const slug = window.__YS_SLUG || TABLE_TO_SLUG[type] || parts[1];
+const id = parts[2];
 const cat = CATEGORIES[type] || CATEGORIES.venues;
 
-document.getElementById('back-link').href = `/category/${type}`;
-document.getElementById('back-link').textContent = `← 返回${cat.zh}列表`;
+const backLink = document.getElementById('back-link');
+if (backLink) {
+  backLink.href = `/${slug}`;
+  backLink.textContent = `← 返回${cat.zh}列表`;
+}
 
 function renderContactLinks(item) {
   const container = document.getElementById('contact-links');
+  if (!container) return;
   const links = [];
 
   if (item.line_at) {
@@ -65,7 +76,8 @@ function renderContactLinks(item) {
 
   if (links.length > 0) {
     container.innerHTML = links.join('');
-    document.getElementById('detail-contact').style.display = '';
+    const section = document.getElementById('detail-contact');
+    if (section) section.style.display = '';
   }
 }
 
@@ -77,8 +89,10 @@ function renderFacilities(item) {
   if (facilities.length === 0) return;
 
   const container = document.getElementById('facility-list');
+  if (!container) return;
   container.innerHTML = facilities.map(f => `<span class="ys-detail-facility">${f}</span>`).join('');
-  document.getElementById('detail-facilities').style.display = '';
+  const section = document.getElementById('detail-facilities');
+  if (section) section.style.display = '';
 }
 
 function renderExtraInfo(item) {
@@ -91,13 +105,15 @@ function renderExtraInfo(item) {
   if (infos.length === 0) return;
 
   const container = document.getElementById('info-grid');
+  if (!container) return;
   container.innerHTML = infos.map(i => `
     <div class="ys-detail-meta-item">
       <span class="ys-detail-meta-label">${i.label}</span>
       <span class="ys-detail-meta-value">${i.value}</span>
     </div>
   `).join('');
-  document.getElementById('detail-info').style.display = '';
+  const section = document.getElementById('detail-info');
+  if (section) section.style.display = '';
 }
 
 async function load() {
@@ -107,8 +123,10 @@ async function load() {
     const item = await res.json();
 
     document.title = `${item.name} — 有鬆島`;
-    document.getElementById('loading').style.display = 'none';
-    document.getElementById('content').style.display = '';
+    const loadingEl = document.getElementById('loading');
+    if (loadingEl) loadingEl.style.display = 'none';
+    const contentEl = document.getElementById('content');
+    if (contentEl) contentEl.style.display = '';
 
     document.getElementById('detail-label').textContent = cat.label;
     document.getElementById('detail-name').textContent = item.name;
@@ -119,34 +137,39 @@ async function load() {
     img.alt = item.name;
 
     const metaContainer = document.getElementById('detail-meta');
-    cat.metaFields.forEach(field => {
-      const val = item[field];
-      if (!val) return;
-      const div = document.createElement('div');
-      div.className = 'ys-detail-meta-item';
-      div.innerHTML = `
-        <span class="ys-detail-meta-label">${META_LABELS[field] || field}</span>
-        <span class="ys-detail-meta-value">${val}</span>
-      `;
-      metaContainer.appendChild(div);
-    });
-
-    if (type === 'venues') {
-      renderFacilities(item);
+    if (metaContainer) {
+      metaContainer.innerHTML = '';
+      cat.metaFields.forEach(field => {
+        const val = item[field];
+        if (!val) return;
+        const div = document.createElement('div');
+        div.className = 'ys-detail-meta-item';
+        div.innerHTML = `
+          <span class="ys-detail-meta-label">${META_LABELS[field] || field}</span>
+          <span class="ys-detail-meta-value">${val}</span>
+        `;
+        metaContainer.appendChild(div);
+      });
     }
+
+    if (type === 'venues') renderFacilities(item);
     renderExtraInfo(item);
     renderContactLinks(item);
 
     const tags = item.tags || item.specialties || [];
     const tagsContainer = document.getElementById('detail-tags');
-    tags.forEach(tag => {
-      const span = document.createElement('span');
-      span.className = 'ys-tag';
-      span.textContent = tag;
-      tagsContainer.appendChild(span);
-    });
+    if (tagsContainer) {
+      tagsContainer.innerHTML = '';
+      tags.forEach(tag => {
+        const span = document.createElement('span');
+        span.className = 'ys-tag';
+        span.textContent = tag;
+        tagsContainer.appendChild(span);
+      });
+    }
   } catch (err) {
-    document.getElementById('loading').textContent = '找不到此資源';
+    const loadingEl = document.getElementById('loading');
+    if (loadingEl) loadingEl.textContent = '找不到此資源';
     console.error(err);
   }
 }

@@ -5,7 +5,8 @@ const pool = require('./src/config/db');
 const apiRoutes = require('./src/routes/api');
 const { renderCategoryPage, CATEGORIES } = require('./src/templates/category');
 const { renderDetailPage } = require('./src/templates/detail');
-const { renderPage, headerHTML, footerHTML, SITE_URL } = require('./src/templates/layout');
+const { renderPage, headerHTML, footerHTML, SITE_URL, SLUG_MAP, TABLE_TO_SLUG } = require('./src/templates/layout');
+const { aboutPage, partnersPage, privacyPage } = require('./src/templates/pages');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -14,6 +15,8 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/api', apiRoutes);
+
+// --- robots.txt & sitemap ---
 
 app.get('/robots.txt', (req, res) => {
   res.type('text/plain').send(`User-agent: *
@@ -26,15 +29,18 @@ Sitemap: ${SITE_URL}/sitemap.xml
 
 app.get('/sitemap.xml', async (req, res) => {
   try {
-    const urls = [{ loc: '/', priority: '1.0', changefreq: 'weekly' }];
+    const urls = [
+      { loc: '/', priority: '1.0', changefreq: 'weekly' },
+      { loc: '/about', priority: '0.5', changefreq: 'monthly' },
+      { loc: '/partners', priority: '0.5', changefreq: 'monthly' },
+      { loc: '/privacy', priority: '0.3', changefreq: 'yearly' },
+    ];
 
-    for (const type of Object.keys(CATEGORIES)) {
-      urls.push({ loc: `/category/${type}`, priority: '0.8', changefreq: 'weekly' });
-
-      const table = type;
+    for (const [table, slug] of Object.entries(TABLE_TO_SLUG)) {
+      urls.push({ loc: `/${slug}`, priority: '0.8', changefreq: 'weekly' });
       const { rows } = await pool.query(`SELECT id FROM ${table} ORDER BY id`);
       rows.forEach(row => {
-        urls.push({ loc: `/detail/${type}/${row.id}`, priority: '0.6', changefreq: 'monthly' });
+        urls.push({ loc: `/${slug}/${row.id}`, priority: '0.6', changefreq: 'monthly' });
       });
     }
 
@@ -54,48 +60,80 @@ ${urls.map(u => `  <url>
   }
 });
 
-app.get('/category/:type', async (req, res) => {
+// --- 301 redirects from old URLs ---
+
+app.get('/category/:type', (req, res) => {
   const type = req.params.type;
-  if (!CATEGORIES[type]) {
-    return res.status(404).send(render404Page());
-  }
+  const slug = TABLE_TO_SLUG[type];
+  if (slug) return res.redirect(301, `/${slug}`);
+  res.status(404).send(render404Page());
+});
+
+app.get('/detail/:type/:id', (req, res) => {
+  const { type, id } = req.params;
+  const slug = TABLE_TO_SLUG[type];
+  if (slug) return res.redirect(301, `/${slug}/${id}`);
+  res.status(404).send(render404Page());
+});
+
+// --- Static pages (before slug catch-all) ---
+
+app.get('/about', (req, res) => { res.send(aboutPage()); });
+app.get('/partners', (req, res) => { res.send(partnersPage()); });
+app.get('/privacy', (req, res) => { res.send(privacyPage()); });
+
+// --- New slug-based category routes ---
+
+app.get('/:slug', async (req, res, next) => {
+  const slug = req.params.slug;
+  const table = SLUG_MAP[slug];
+  if (!table) return next();
 
   try {
     const { rows } = await pool.query(
-      `SELECT * FROM ${type} ORDER BY featured DESC, created_at DESC`
+      `SELECT * FROM ${table} ORDER BY featured DESC, created_at DESC`
     );
-    const html = renderCategoryPage(type, rows);
+    const html = renderCategoryPage(table, rows);
     res.send(html);
   } catch (err) {
-    console.error(`Category ${type} error:`, err.message);
-    const html = renderCategoryPage(type, []);
+    console.error(`Category ${slug} error:`, err.message);
+    const html = renderCategoryPage(table, []);
     res.send(html);
   }
 });
 
-app.get('/detail/:type/:id', async (req, res) => {
-  const { type, id } = req.params;
-  if (!CATEGORIES[type]) {
-    return res.status(404).send(render404Page());
-  }
+// --- New slug-based detail routes ---
+
+app.get('/:slug/:id', async (req, res, next) => {
+  const { slug, id } = req.params;
+  const table = SLUG_MAP[slug];
+  if (!table) return next();
 
   const numId = parseInt(id, 10);
-  if (isNaN(numId)) {
-    return res.status(404).send(render404Page());
-  }
+  if (isNaN(numId)) return res.status(404).send(render404Page());
 
   try {
-    const { rows } = await pool.query(`SELECT * FROM ${type} WHERE id = $1`, [numId]);
-    if (rows.length === 0) {
-      return res.status(404).send(render404Page());
-    }
-    const html = renderDetailPage(type, rows[0]);
+    const { rows } = await pool.query(`SELECT * FROM ${table} WHERE id = $1`, [numId]);
+    if (rows.length === 0) return res.status(404).send(render404Page());
+
+    let relatedItems = [];
+    try {
+      const { rows: related } = await pool.query(
+        `SELECT * FROM ${table} WHERE id != $1 ORDER BY RANDOM() LIMIT 3`,
+        [numId]
+      );
+      relatedItems = related;
+    } catch (_) {}
+
+    const html = renderDetailPage(table, rows[0], relatedItems);
     res.send(html);
   } catch (err) {
-    console.error(`Detail ${type}/${id} error:`, err.message);
+    console.error(`Detail ${slug}/${id} error:`, err.message);
     res.status(500).send(render404Page('載入失敗，請重試'));
   }
 });
+
+// --- 404 ---
 
 function render404Page(message) {
   const body = `

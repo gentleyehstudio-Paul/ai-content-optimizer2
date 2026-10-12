@@ -1,4 +1,4 @@
-const { renderPage, headerHTML, footerHTML, esc } = require('./layout');
+const { renderPage, headerHTML, footerHTML, breadcrumbHTML, esc, TABLE_TO_SLUG } = require('./layout');
 
 const CATEGORIES = {
   venues: { zh: '場地', en: 'VENUE', label: '01 — 場地', subtitle: 'Healing spaces across the island', descKey: 'description', secondaryKey: 'location', hero: '/assets/images/venue-pool.jpg', defaultImg: '/assets/images/venue-zen.jpg', seoDesc: '探索台灣各地療癒場地——瑜伽教室、靜心空間、茶室與自然場域，找到適合你的身心安放之所。' },
@@ -11,6 +11,8 @@ function renderCategoryPage(type, items) {
   const cat = CATEGORIES[type];
   if (!cat) return null;
 
+  const slug = TABLE_TO_SLUG[type];
+
   const itemCards = (items || []).map((item, i) => {
     const desc = item[cat.descKey] || item.description || '';
     const secondary = item[cat.secondaryKey] || '';
@@ -20,7 +22,7 @@ function renderCategoryPage(type, items) {
     if (item.portaly_category) badges.push(item.portaly_category);
     if (item.price_info) badges.push(item.price_info);
 
-    return `<a class="ys-card ys-in" href="/detail/${esc(type)}/${item.id}" style="animation-delay:${i * 0.08}s">
+    return `<a class="ys-card ys-in" href="/${esc(slug)}/${item.id}" style="animation-delay:${i * 0.08}s">
       <div class="ys-card-image">
         <img src="${esc(imgSrc)}" alt="${esc(item.name)}" loading="lazy" width="400" height="300">
         <span class="ys-card-number">${String(i + 1).padStart(2, '0')}</span>
@@ -52,6 +54,8 @@ function renderCategoryPage(type, items) {
   </div>
 
   <div class="ys-container">
+    ${breadcrumbHTML([{ label: cat.zh, href: `/${slug}` }])}
+
     <div class="ys-category-layout">
       <aside class="ys-sidebar" id="sidebar">
         <button class="ys-sidebar-toggle" id="sidebar-toggle">
@@ -132,6 +136,7 @@ function renderCategoryPage(type, items) {
   </div>
 
   ${footerHTML()}
+  <script>window.__YS_TYPE="${type}";window.__YS_SLUG="${slug}";</script>
   <script src="/js/category.js"></script>`;
 
   const noindex = (type === 'herbals' || type === 'ingredients') && items && items.length <= 1;
@@ -139,7 +144,7 @@ function renderCategoryPage(type, items) {
   return renderPage({
     title: `探索${cat.zh}`,
     description: cat.seoDesc,
-    path: `/category/${type}`,
+    path: `/${slug}`,
     ogImage: cat.hero,
     noindex,
     body,

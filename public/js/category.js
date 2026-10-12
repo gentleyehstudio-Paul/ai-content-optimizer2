@@ -1,3 +1,5 @@
+const SLUG_TO_TABLE = { places: 'venues', teachers: 'facilitators', herbs: 'herbals', food: 'ingredients' };
+
 const CATEGORIES = {
   venues: { zh: '場地', en: 'VENUE', label: '01 — 場地', subtitle: 'Healing spaces across the island', descKey: 'description', secondaryKey: 'location', hero: '/assets/images/venue-pool.jpg', defaultImg: '/assets/images/venue-zen.jpg' },
   facilitators: { zh: '師資', en: 'FACILITATOR', label: '02 — 師資', subtitle: 'Guides for body and mind', descKey: 'bio', secondaryKey: 'title', hero: '/assets/images/facilitator-meditation.jpg', defaultImg: '/assets/images/facilitator-ceremony.jpg' },
@@ -5,8 +7,15 @@ const CATEGORIES = {
   ingredients: { zh: '食材', en: 'INGREDIENT', label: '04 — 食材', subtitle: 'Farm-to-table healing ingredients', descKey: 'description', secondaryKey: 'origin', hero: '/assets/images/ingredient-harvest.jpg', defaultImg: '/assets/images/herbal-bowls.jpg' },
 };
 
-const path = window.location.pathname;
-const type = path.split('/category/')[1]?.replace(/\/$/, '') || 'venues';
+const type = window.__YS_TYPE || (function() {
+  const p = window.location.pathname;
+  const slugMatch = p.match(/^\/(places|teachers|herbs|food)/);
+  if (slugMatch) return SLUG_TO_TABLE[slugMatch[1]];
+  const catMatch = p.split('/category/')[1]?.replace(/\/$/, '');
+  return catMatch || 'venues';
+})();
+
+const slug = window.__YS_SLUG || Object.entries(SLUG_TO_TABLE).find(([, v]) => v === type)?.[0] || 'places';
 const cat = CATEGORIES[type] || CATEGORIES.venues;
 
 let allItems = [];
@@ -94,7 +103,7 @@ function renderGrid(items) {
   items.forEach((item, i) => {
     const card = document.createElement('a');
     card.className = 'ys-card ys-in';
-    card.href = `/detail/${type}/${item.id}`;
+    card.href = `/${slug}/${item.id}`;
     card.style.animationDelay = `${i * 0.08}s`;
 
     const desc = item[cat.descKey] || item.description || '';
