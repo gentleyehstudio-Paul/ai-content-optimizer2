@@ -134,11 +134,14 @@ function renderCategoryPage(type, items) {
   ${footerHTML()}
   <script src="/js/category.js"></script>`;
 
+  const noindex = (type === 'herbals' || type === 'ingredients') && items && items.length <= 1;
+
   return renderPage({
     title: `探索${cat.zh}`,
     description: cat.seoDesc,
     path: `/category/${type}`,
     ogImage: cat.hero,
+    noindex,
     body,
   });
 }
