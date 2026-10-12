@@ -129,7 +129,10 @@ function renderCategoryPage(type, items) {
           : `<div id="grid" class="ys-grid" style="display:none"></div>`}
         <div id="loading" class="ys-loading" style="display:none">載入中⋯</div>
         <div id="empty" class="ys-empty" style="${!items || items.length === 0 ? '' : 'display:none'}">
-          <p>目前尚無資料</p>
+          ${type === 'ingredients'
+            ? `<p style="font-size:18px;letter-spacing:.12em;color:var(--dark)">即將上線</p>
+               <p style="margin-top:12px;font-size:14px;color:var(--muted)">食材資源正在整理中，敬請期待。</p>`
+            : `<p>目前尚無資料</p>`}
           <a href="/" style="display:inline-block;margin-top:24px;font-size:13px;letter-spacing:.14em;color:var(--brown)">← 回首頁</a>
         </div>
         <div id="no-results" class="ys-empty" style="display:none">
@@ -144,7 +147,7 @@ function renderCategoryPage(type, items) {
   <script>window.__YS_TYPE="${type}";window.__YS_SLUG="${slug}";</script>
   <script src="/js/category.js"></script>`;
 
-  const noindex = (type === 'herbals' || type === 'ingredients') && items && items.length <= 1;
+  const noindex = type === 'herbals' || type === 'ingredients';
 
   return renderPage({
     title: `探索${cat.zh}`,

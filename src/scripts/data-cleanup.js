@@ -6,13 +6,15 @@ async function run() {
 
   // 1. Backup all tables as JSON
   console.log('1. Backing up tables...');
+  const fs = require('fs');
+  const path = require('path');
+  const dir = path.join(__dirname, '../../backups');
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
   for (const table of ['venues', 'facilitators', 'herbals', 'ingredients']) {
     try {
       const { rows } = await pool.query(`SELECT * FROM ${table}`);
       console.log(`  ${table}: ${rows.length} rows`);
-      const fs = require('fs');
-      const dir = require('path').join(__dirname, '../../backups');
-      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
       fs.writeFileSync(`${dir}/${table}_backup.json`, JSON.stringify(rows, null, 2));
     } catch (err) {
       console.error(`  Error backing up ${table}:`, err.message);
@@ -50,44 +52,38 @@ async function run() {
     }
   }
 
-  // 4. Add 2 new venues
+  // 4. Add 2 new venues (only known fields, no fabricated content)
   console.log('\n4. Adding new venues...');
   const newVenues = [
     {
       name: '禪香不二 北投茶香空間',
-      description: '坐落北投溫泉路巷弄，結合日式老屋與現代茶道的靜心空間。提供茶席體驗、冥想引導與小型工作坊場地租借，最多容納 12 人。',
-      location: '台北市北投區',
-      address: '台北市北投區溫泉路 71 巷 22 號',
       region: '台北市北投區',
-      capacity: 12,
-      has_wifi: true,
-      has_parking: false,
-      near_mrt: true,
-      tags: ['茶道', '冥想', '日式空間'],
-      latitude: 25.1367,
-      longitude: 121.5087,
+      address: '112臺北市北投區溫泉里光明路240號2樓之8',
+      contact: '0911 675 120',
+      website: 'https://inzense.com.tw',
+      description: '位在北投溫泉區的品香與品茶空間，可體驗品茶、品香與手作香錐。',
+      tags: ['茶空間', '品香', '製香體驗', '昏靜'],
+      latitude: 25.1360922,
+      longitude: 121.5073616,
     },
     {
       name: '山所．沐光',
-      description: '苗栗山區的自然療癒場域，由老三合院改建。四周環山、溪水相伴，適合瑜伽、聲療與深度靜修。提供住宿與在地食材餐飲，最多 20 人。',
-      location: '苗栗縣南庄鄉',
-      address: '苗栗縣南庄鄉蓬萊村 8 鄰 42 號',
-      region: '苗栗縣南庄鄉',
-      capacity: 20,
-      has_wooden_floor: true,
-      has_audio_equipment: true,
-      has_kitchen: true,
-      has_parking: true,
-      tags: ['瑜伽', '靜修', '自然場域', '住宿'],
-      latitude: 24.5876,
-      longitude: 120.9821,
+      region: '新北市永和區',
+      address: '234新北市永和區保順里仁愛路248-1號',
+      description: '永和的小班制瑜伽教室，鄰近公園綠意，課程包含椅子瑜伽等輔助練習。',
+      tags: ['瑜伽', '小班制', '晨動', '昏靜'],
+      latitude: 25.0090234,
+      longitude: 121.5045157,
     },
   ];
 
   for (const venue of newVenues) {
     try {
       const fields = Object.keys(venue);
-      const values = fields.map(k => venue[k]);
+      const values = fields.map(k => {
+        const v = venue[k];
+        return Array.isArray(v) ? JSON.stringify(v) : v;
+      });
       const placeholders = fields.map((_, i) => `$${i + 1}`);
       const { rows } = await pool.query(
         `INSERT INTO venues (${fields.join(', ')}) VALUES (${placeholders.join(', ')}) RETURNING id, name`,
@@ -99,17 +95,37 @@ async function run() {
     }
   }
 
-  // 5. Normalize region to 縣市＋區 format
+  // 5. Normalize region — check and report; update only where address provides clear info
   console.log('\n5. Checking region normalization...');
   for (const table of ['venues', 'facilitators']) {
     try {
-      const { rows } = await pool.query(`SELECT id, name, region FROM ${table} WHERE region IS NOT NULL`);
+      const { rows } = await pool.query(`SELECT id, name, region, address FROM ${table} WHERE region IS NOT NULL`);
       console.log(`  ${table}: ${rows.length} items with region`);
-      rows.forEach(r => console.log(`    id=${r.id}: ${r.name} → ${r.region}`));
+      rows.forEach(r => {
+        const regionOk = /^.{2,3}[市縣].+[區鄉鎮市]$/.test(r.region || '');
+        console.log(`    id=${r.id}: ${r.name} → region="${r.region}" ${regionOk ? '✓' : '⚠ 需確認'} | address="${r.address || '(無)'}"`);
+      });
     } catch (err) {
       console.error(`  Error:`, err.message);
     }
   }
+
+  // 6. Report final counts
+  console.log('\n6. Final counts:');
+  for (const table of ['venues', 'facilitators', 'herbals', 'ingredients']) {
+    try {
+      const { rows } = await pool.query(`SELECT COUNT(*) as count FROM ${table}`);
+      console.log(`  ${table}: ${rows[0].count} rows`);
+    } catch (err) {
+      console.error(`  ${table}: error - ${err.message}`);
+    }
+  }
+
+  console.log('\nDeleted IDs:');
+  console.log('  venues: 1, 2, 3');
+  console.log('  facilitators: 1, 2, 3');
+  console.log('  herbals: 1, 2');
+  console.log('  ingredients: 1, 2, 3');
 
   console.log('\n=== Cleanup complete ===');
   process.exit(0);
