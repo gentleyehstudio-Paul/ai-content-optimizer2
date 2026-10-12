@@ -69,7 +69,7 @@
   <button data-mode="harmonic">共鳴</button>
   <span class="sep"></span>
   <button id="bTheme">宣紙</button>
-  <button id="bHand">手部追蹤</button>
+  <button id="bObj">物件追蹤</button>
   <button id="bTag">標註</button>
   <button id="bRec">錄影</button>
   <button id="bFreeze">凍結</button>
@@ -323,7 +323,7 @@ function step(now){
   }
 
   if (camStream) camStrokes(baseT);
-  if (handsOn) handInk(baseT);
+  if (objOn) objectInk(baseT);
   if (mode==='harmonic' || state.peaks.length>=2) rings(baseT);
   ctx.globalCompositeOperation = 'source-over';
 }
@@ -361,6 +361,31 @@ function rings(t){
 }
 
 
+/* ---------------- 霧狀墨暈 Mist stamps ----------------
+   以預先繪好的柔邊徑向漸層貼圖，縮放/旋轉後蓋印，取代硬邊直線，
+   疊加後呈現霧狀水墨；顏色依音高分 24 階。 */
+const SPN = 24, SPR = 64;
+let sprites = [];
+function buildSprites(){
+  sprites = [];
+  for (let i=0;i<SPN;i++){
+    const c = document.createElement('canvas'); c.width = c.height = SPR;
+    const g = c.getContext('2d'), t = i/(SPN-1);
+    const gr = g.createRadialGradient(SPR/2,SPR/2,0,SPR/2,SPR/2,SPR/2);
+    gr.addColorStop(0, inkColor(t,.95)); gr.addColorStop(.45, inkColor(t,.38)); gr.addColorStop(1, inkColor(t,0));
+    g.fillStyle = gr; g.fillRect(0,0,SPR,SPR);
+    sprites.push(c);
+  }
+}
+function stamp(x,y,len,wid,ang,t,alpha){
+  const sp = sprites[Math.min(SPN-1,Math.max(0,t*SPN|0))];
+  const c = Math.cos(ang), s = Math.sin(ang), k = DPR/SPR;
+  ctx.globalAlpha = alpha;
+  ctx.setTransform(c*len*k, s*len*k, -s*wid*k, c*wid*k, x*DPR, y*DPR);
+  ctx.drawImage(sp,-SPR/2,-SPR/2);
+  ctx.setTransform(DPR,0,0,DPR,0,0); ctx.globalAlpha = 1;
+}
+
 /* ---------------- Camera → ink strokes (聲音調制) ----------------
    鏡頭提供「形」（邊緣、動態），聲音提供「勢」：
    能量→墨量與線長、擊缽→爆發加粗、音高→墨色、模式→筆走方向。 */
@@ -387,8 +412,8 @@ function setupCam(){
 }
 async function toggleCam(){
   if (camStream){
-    camStream.getTracks().forEach(t=>t.stop()); camStream = null; hands = []; handsOn = false;
-    $('bHand').classList.remove('on'); $('bHand').textContent = '手部追蹤';
+    camStream.getTracks().forEach(t=>t.stop()); camStream = null; objs = []; objOn = false;
+    $('bObj').classList.remove('on'); $('bObj').textContent = '物件追蹤';
     $('bCam').classList.remove('on'); $('bCam').textContent = '開啟鏡頭'; return;
   }
   try{
@@ -444,9 +469,12 @@ function camStrokes(baseT){
     else { tx += Math.sin(T*.4+a.ph)*.15; ty += Math.cos(T*.4+a.ph)*.15; }
     const tm = Math.hypot(tx,ty)||1, len = lenK*(.5+edge)*a.jl*.5;
     const sx = camMirror ? W-px : px, dx = (camMirror?-1:1)*tx/tm*len, dy = ty/tm*len;
-    ctx.strokeStyle = inkColor(Math.min(1,Math.max(0,baseT+(a.jl-1)*.2)), ink, on>.4?20:0);
-    ctx.lineWidth = .7 + ink*2.2*(1+on);
-    ctx.beginPath(); ctx.moveTo(sx-dx,py-dy); ctx.lineTo(sx+dx,py+dy); ctx.stroke();
+    const tt = Math.min(1,Math.max(0,baseT+(a.jl-1)*.2)), ang = Math.atan2(dy,dx);
+    stamp(sx, py, len*2.2, 3+ink*8*(1+on), ang, tt, Math.min(paper?.26:.12, ink*(paper?.3:.16)));   // 暗場用加法混色，須更淡          // 霧狀墨痕
+    if (a.jl > 1.2){                                                                    // 零星墨點
+      ctx.fillStyle = inkColor(tt, Math.min(.9, ink*1.2));
+      ctx.fillRect(sx+(hash(a.ph*91)-.5)*len*3, py+(hash(a.ph*37)-.5)*len*3, 1.6, 1.6);
+    }
   }
 }
 
@@ -480,7 +508,7 @@ function updateNodes(){
 function drawTags(baseT){
   octx.clearRect(0,0,W,H);
   if (!camStream) return;
-  if (handsOn && drawHands(performance.now())) return;   // 有偵測到手時，標註貼合手部；否則退回動態節點
+  if (objOn) drawObjects(performance.now());
   if (!tagsOn) return;
   if (tagFrame++ % 4 === 0) updateNodes();
   const fs = Math.max(8, Math.min(W,H)*.012), mx = camMirror;
@@ -509,117 +537,101 @@ function drawTags(baseT){
 }
 
 
-/* ---------------- 手部關鍵點 Hand landmarks ----------------
-   MediaPipe HandLandmarker 偵測 21 個關節（首次開啟才下載模型，約 8MB）。
-   標註貼合手部：輪廓描邊、骨架、關節方框標籤、指尖間弧線；
-   指尖在墨層留下筆跡，粗細與濃度由聲音決定；擊缽時掌心擴散一圈漣漪。 */
+/* ---------------- 物件追蹤 Object tracking ----------------
+   MediaPipe ObjectDetector（COCO 80 類，首次開啟才下載模型，約 7MB）。
+   每個物件：四角追蹤框 + 紅色標記 + 名稱/信心 + 即時頻率；物件之間以弧線相連；
+   物件中心長出霧狀墨暈，濃度隨聲音能量；擊缽時向外漣漪。
+   COCO 沒有「手」這個類別，手由「人」的框與下方的動態節點涵蓋。 */
 const MP_BASE = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
-const HAND_MODEL = 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
-let handsOn = false, handLm = null, handLoading = false, hands = [], handsSeen = 0, lastVT = -1, handTs = 0;
-const tipPrev = {};
-const BONES = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[9,10],[10,11],[11,12],[13,14],[14,15],[15,16],[17,18],[18,19],[19,20],[5,9],[9,13],[13,17],[0,17]];
-const PALM = [0,1,5,9,13,17], TIPS = [4,8,12,16,20], LABELED = [0,4,8,12,16,20,5,9,13,17];
+const OBJ_MODEL = 'https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float16/1/efficientdet_lite0.tflite';
+let objOn = false, objDet = null, objLoading = false, objs = [], objSeen = 0, objLastVT = -1, objTs = 0, objLastRun = 0;
+const ZH = {person:'人',bowl:'缽',cup:'杯',bottle:'瓶','wine glass':'杯',vase:'花器',book:'書',laptop:'筆電','cell phone':'手機',chair:'椅',couch:'沙發',bed:'床','potted plant':'盆栽',clock:'鐘',scissors:'剪刀',keyboard:'鍵盤',mouse:'滑鼠',tv:'螢幕',cat:'貓',dog:'狗',bird:'鳥',umbrella:'傘',backpack:'背包',handbag:'手袋',spoon:'匙',knife:'刀',fork:'叉','dining table':'桌'};
 
-async function loadHands(){
-  if (handLm || handLoading) return;
-  handLoading = true; $('bHand').textContent = '載入模型…';
+async function loadObjects(){
+  if (objDet || objLoading) return;
+  objLoading = true; $('bObj').textContent = '載入模型…';
   try{
     const mod = await import(MP_BASE + '/vision_bundle.mjs');
     const fileset = await mod.FilesetResolver.forVisionTasks(MP_BASE + '/wasm');
-    const opts = delegate => ({baseOptions:{modelAssetPath:HAND_MODEL, delegate}, runningMode:'VIDEO', numHands:2});
-    try{ handLm = await mod.HandLandmarker.createFromOptions(fileset, opts('GPU')); }
-    catch(_){ handLm = await mod.HandLandmarker.createFromOptions(fileset, opts('CPU')); }
-    $('bHand').textContent = '手部追蹤中';
+    const opts = delegate => ({baseOptions:{modelAssetPath:OBJ_MODEL, delegate}, runningMode:'VIDEO', scoreThreshold:.35, maxResults:10});
+    try{ objDet = await mod.ObjectDetector.createFromOptions(fileset, opts('GPU')); }
+    catch(_){ objDet = await mod.ObjectDetector.createFromOptions(fileset, opts('CPU')); }
+    $('bObj').textContent = '物件追蹤中';
   }catch(e){
-    handsOn = false; $('bHand').classList.remove('on'); $('bHand').textContent = '手部追蹤';
-    say('手部模型載入失敗：' + (e.message||e)); console.error(e);
+    objOn = false; $('bObj').classList.remove('on'); $('bObj').textContent = '物件追蹤';
+    say('物件模型載入失敗：' + (e.message||e)); console.error(e);
   }
-  handLoading = false;
+  objLoading = false;
 }
 
-function detectHands(now){
-  if (!handLm || !camVid || camVid.readyState < 2 || camVid.currentTime === lastVT) return;
-  lastVT = camVid.currentTime;
-  handTs = Math.max(handTs+1, now);
-  let res; try{ res = handLm.detectForVideo(camVid, handTs); }catch(e){ return; }
+function detectObjects(now){
+  // 約 8 次/秒即可，物件框隨後以平滑逼近，避免拖慢主畫面
+  if (!objDet || !camVid || camVid.readyState < 2 || camVid.currentTime === objLastVT || now - objLastRun < 120) return;
+  objLastVT = camVid.currentTime; objLastRun = now;
+  objTs = Math.max(objTs+1, now);
+  let res; try{ res = objDet.detectForVideo(camVid, objTs); }catch(e){ return; }
   const vw = camVid.videoWidth, vh = camVid.videoHeight, sc = Math.max(W/vw, H/vh), ox = (W-vw*sc)/2, oy = (H-vh*sc)/2;
-  if (!res.landmarks.length){ if (now - handsSeen > 250) hands = []; return; }
-  handsSeen = now;
-  const next = res.landmarks.map(lm => lm.map(q => { const px = q.x*vw*sc+ox; return {x: camMirror ? W-px : px, y: q.y*vh*sc+oy}; }));
-  // 與上一幀最近的手配對並平滑，減少抖動
-  hands = next.map(h => {
-    let best = null, bd = W*.3;
-    hands.forEach(o => { const d = Math.hypot(o[0].x-h[0].x, o[0].y-h[0].y); if (d < bd){ bd = d; best = o; } });
-    return best ? h.map((q,i) => ({x: best[i].x+(q.x-best[i].x)*.6, y: best[i].y+(q.y-best[i].y)*.6})) : h;
+  if (!res.detections.length){ if (now - objSeen > 600) objs = []; return; }
+  objSeen = now;
+  const next = res.detections.map(d => {
+    const bb = d.boundingBox, c = d.categories[0];
+    let x = bb.originX*sc+ox, w = bb.width*sc; const y = bb.originY*sc+oy, h = bb.height*sc;
+    if (camMirror) x = W-x-w;
+    return {x, y, w, h, name:c.categoryName, score:c.score, id:0};
+  });
+  // 與上一輪同名且最近的框配對，平滑位置並保留 id
+  objs = next.map(n => {
+    let best = null, bd = Math.max(W,H)*.25;
+    objs.forEach(o => { if (o.name !== n.name) return; const d = Math.hypot(o.x+o.w/2-n.x-n.w/2, o.y+o.h/2-n.y-n.h/2); if (d < bd){ bd = d; best = o; } });
+    if (best){ const k = .5; n.x = best.x+(n.x-best.x)*k; n.y = best.y+(n.y-best.y)*k; n.w = best.w+(n.w-best.w)*k; n.h = best.h+(n.h-best.h)*k; n.id = best.id; }
+    else n.id = ++objId;
+    return n;
   });
 }
+let objId = 0;
 
-function handSize(h){ return Math.hypot(h[0].x-h[9].x, h[0].y-h[9].y) || 60; }
-
-// 貼合輪廓：所有骨頭與手掌畫成一條粗圓角路徑，再挖掉內部，只留 1px 外緣
-function handOutline(h, fg, alpha){
-  const T = handSize(h)*.21;
-  const path = () => {
-    octx.beginPath();
-    BONES.forEach(([a,b]) => { octx.moveTo(h[a].x,h[a].y); octx.lineTo(h[b].x,h[b].y); });
-    octx.moveTo(h[PALM[0]].x,h[PALM[0]].y); PALM.slice(1).forEach(i => octx.lineTo(h[i].x,h[i].y)); octx.closePath();
-  };
-  octx.lineCap = octx.lineJoin = 'round';
-  octx.strokeStyle = `rgba(${fg},${alpha})`; octx.fillStyle = `rgba(${fg},${alpha})`;
-  octx.lineWidth = T+4; path(); octx.stroke(); octx.fill();
-  octx.globalCompositeOperation = 'destination-out';   // 擦除量取決於來源 alpha，必須用不透明色
-  octx.strokeStyle = octx.fillStyle = '#000';
-  octx.lineWidth = T; path(); octx.stroke(); octx.fill();
-  octx.globalCompositeOperation = 'source-over';
-}
-
-function drawHands(now){
-  detectHands(now);
-  if (!hands.length) return false;
+function drawObjects(now){
+  detectObjects(now);
+  if (!objs.length) return;
   const fg = paper ? '22,18,12' : '243,238,226', acc = '212,69,46', e = state.energy, on = state.onset;
   const fs = Math.max(8, Math.min(W,H)*.012);
-  hands.forEach(h => handOutline(h, fg, .75+e*.25));
-  octx.font = `${fs}px ui-monospace,Menlo,monospace`; octx.textBaseline = 'top'; octx.lineWidth = .7;
-  const arc = (a,b,al,bend=.18) => {
-    const cx=(a.x+b.x)/2-(b.y-a.y)*bend, cy=(a.y+b.y)/2+(b.x-a.x)*bend;
-    octx.strokeStyle = `rgba(${fg},${al})`; octx.beginPath(); octx.moveTo(a.x,a.y); octx.quadraticCurveTo(cx,cy,b.x,b.y); octx.stroke();
-  };
-  hands.forEach((h,hi) => {
-    const size = handSize(h);
-    BONES.forEach(([a,b]) => arc(h[a],h[b],.35,0));
-    TIPS.forEach((t,k) => { arc(h[t],h[0],.2+e*.3,.22); if (k<4) arc(h[t],h[TIPS[k+1]],.2+e*.3,-.3); });   // 網絡弧線
-    if (on > .05){                                                                                         // 擊缽漣漪
-      const c = h[9]; octx.strokeStyle = `rgba(${acc},${Math.min(1,on)*.7})`;
-      octx.beginPath(); octx.arc(c.x,c.y,size*(.8+(1-on)*1.6),0,Math.PI*2); octx.stroke();
-    }
-    h.forEach((q,i) => {
-      const lab = LABELED.includes(i), w = lab ? 11 : 5, hh = lab ? 6 : 3.5;
-      octx.strokeStyle = `rgba(${fg},.9)`; octx.strokeRect(q.x-w/2,q.y-hh/2,w,hh);
-      octx.fillStyle = `rgba(${acc},.95)`; octx.fillRect(q.x-w/2,q.y-hh/2,lab?3:2,hh);
-      if (!lab) return;
-      octx.fillStyle = `rgba(${fg},.88)`;
-      const f = state.freq ? (state.freq*10+i+hi*21).toFixed(1) : (16000+i+hi*21).toFixed(1);
-      octx.fillText(POOL[i%POOL.length], q.x+w/2+3, q.y-fs);
-      octx.fillText(`${f}  e=${e.toFixed(2)}`, q.x+w/2+3, q.y);
+  octx.font = `${fs}px ui-monospace,Menlo,monospace`; octx.textBaseline = 'top'; octx.lineWidth = 1;
+  // 物件之間的弧線
+  objs.forEach((o,i) => objs.slice(i+1).forEach(m => {
+    const x1=o.x+o.w/2, y1=o.y+o.h/2, x2=m.x+m.w/2, y2=m.y+m.h/2;
+    octx.strokeStyle = `rgba(${fg},${.2+e*.3})`;
+    octx.beginPath(); octx.moveTo(x1,y1); octx.quadraticCurveTo((x1+x2)/2-(y2-y1)*.2,(y1+y2)/2+(x2-x1)*.2,x2,y2); octx.stroke();
+  }));
+  objs.forEach(o => {
+    const L = Math.min(o.w,o.h)*.22, cx = o.x+o.w/2, cy = o.y+o.h/2;
+    octx.strokeStyle = `rgba(${fg},.9)`;
+    octx.beginPath();                                                                     // 四角括弧
+    [[o.x,o.y,1,1],[o.x+o.w,o.y,-1,1],[o.x,o.y+o.h,1,-1],[o.x+o.w,o.y+o.h,-1,-1]].forEach(([x,y,sx,sy]) => {
+      octx.moveTo(x+sx*L,y); octx.lineTo(x,y); octx.lineTo(x,y+sy*L);
     });
+    octx.stroke();
+    octx.fillStyle = `rgba(${acc},.95)`; octx.fillRect(o.x-1,o.y-1,5,5);                  // 紅色標記
+    if (on > .05){                                                                         // 擊缽漣漪
+      octx.strokeStyle = `rgba(${acc},${Math.min(1,on)*.6})`;
+      octx.beginPath(); octx.arc(cx,cy,Math.max(o.w,o.h)*(.5+(1-on)*.9),0,Math.PI*2); octx.stroke();
+    }
+    octx.fillStyle = `rgba(${fg},.9)`;
+    octx.fillText(`${o.name}${ZH[o.name]?' '+ZH[o.name]:''}  ${o.score*100|0}%`, o.x+7, o.y-fs-3);
+    const f = state.freq ? (state.freq*10+o.id).toFixed(1) : (16000+o.id).toFixed(1);
+    octx.fillStyle = `rgba(${fg},.7)`; octx.fillText(`${f}  e=${e.toFixed(2)}`, o.x+7, o.y+o.h+3);
   });
-  if (hands.length === 2) TIPS.forEach(t => arc(hands[0][t],hands[1][t],.22+e*.3,.25));                    // 兩手指尖互連
-  return true;
 }
 
-// 指尖在墨層留下筆跡（畫在主畫布，會隨殘影暈開）
-function handInk(baseT){
+// 物件中心的霧狀墨暈（畫在主畫布，會隨殘影擴散）
+function objectInk(baseT){
   const e = state.energy, on = state.onset;
-  hands.forEach((h,hi) => TIPS.forEach((t,k) => {
-    const key = hi*5+k, q = h[t], pv = tipPrev[key]; tipPrev[key] = {x:q.x,y:q.y};
-    if (!pv) return;
-    const sp = Math.hypot(q.x-pv.x,q.y-pv.y); if (sp > W*.2) return;
-    ctx.strokeStyle = inkColor(Math.min(1,baseT+k*.04), Math.min(.9,.3+e*.5+on*.3), on>.4?20:0);
-    ctx.lineWidth = 1+Math.min(4,sp*.15)+e*3+on*3; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(pv.x,pv.y); ctx.lineTo(q.x,q.y); ctx.stroke();
-  }));
-  if (!hands.length) for (const k in tipPrev) delete tipPrev[k];
+  objs.forEach((o,i) => {
+    const r = Math.max(o.w,o.h);
+    stamp(o.x+o.w/2, o.y+o.h/2, r*(.9+e*.8+on*.9), r*(.6+e*.5+on*.7), Math.sin(T*.3+i)*.6, Math.min(1,baseT+i*.07), Math.min(paper?.26:.12, .03+e*.14+on*.14));
+  });
 }
+
+buildSprites();
 
 /* ---------------- Loop & UI ---------------- */
 let lastInput = performance.now();
@@ -671,14 +683,14 @@ $('bTheme').onclick = () => {
   paper = !paper;
   document.body.classList.toggle('paper', paper);
   $('bTheme').textContent = paper ? '暗場' : '宣紙';
-  paintBg(1);
+  buildSprites(); paintBg(1);
 };
 
-$('bHand').onclick = () => {
-  if (!camStream){ say('手部追蹤需要先開啟鏡頭'); return; }
-  handsOn = !handsOn; $('bHand').classList.toggle('on', handsOn);
-  if (handsOn) loadHands().then(()=>{ if (handLm) $('bHand').textContent = '手部追蹤中'; });
-  else { hands = []; $('bHand').textContent = '手部追蹤'; }
+$('bObj').onclick = () => {
+  if (!camStream){ say('物件追蹤需要先開啟鏡頭'); return; }
+  objOn = !objOn; $('bObj').classList.toggle('on', objOn);
+  if (objOn) loadObjects().then(()=>{ if (objDet) $('bObj').textContent = '物件追蹤中'; });
+  else { objs = []; $('bObj').textContent = '物件追蹤'; }
 };
 function composeExport(){
   if (ex.width !== cv.width) { ex.width = cv.width; ex.height = cv.height; }
@@ -740,7 +752,7 @@ $('bSave').onclick = () => {
 };
 
 // 供自動化測試使用
-window.__soundInk = { get hands(){return hands;}, strike, state, get mode(){return mode;} };
+window.__soundInk = { get objs(){return objs;}, strike, state, get mode(){return mode;} };
 })();
 </script>
 </body>
