@@ -9,17 +9,6 @@ const path = window.location.pathname;
 const type = path.split('/category/')[1]?.replace(/\/$/, '') || 'venues';
 const cat = CATEGORIES[type] || CATEGORIES.venues;
 
-document.title = `${cat.zh} — 有鬆島`;
-document.getElementById('section-label').textContent = cat.label;
-document.getElementById('page-title').textContent = `探索${cat.zh}`;
-document.getElementById('page-subtitle').textContent = cat.subtitle;
-document.getElementById('page-hero-img').src = cat.hero;
-document.getElementById('page-hero-img').alt = cat.zh;
-
-if (type === 'venues') {
-  document.getElementById('facilities-group').style.display = '';
-}
-
 let allItems = [];
 
 function extractPrice(item) {
@@ -119,7 +108,7 @@ function renderGrid(items) {
 
     card.innerHTML = `
       <div class="ys-card-image">
-        <img src="${imgSrc}" alt="${item.name}">
+        <img src="${imgSrc}" alt="${item.name}" loading="lazy">
         <span class="ys-card-number">${String(i + 1).padStart(2, '0')}</span>
       </div>
       <div class="ys-card-body">
@@ -186,13 +175,18 @@ async function load() {
     const data = await res.json();
     if (!Array.isArray(data)) throw new Error(data.error || 'Invalid response');
     allItems = data;
-    document.getElementById('loading').style.display = 'none';
+    const loadingEl = document.getElementById('loading');
+    if (loadingEl) loadingEl.style.display = 'none';
 
     populateRegionDropdown(allItems);
     bindEvents();
     applyFilters();
   } catch (err) {
-    document.getElementById('loading').textContent = '載入失敗，請重試';
+    const loadingEl = document.getElementById('loading');
+    if (loadingEl) {
+      loadingEl.style.display = '';
+      loadingEl.textContent = '載入失敗，請重試';
+    }
     console.error(err);
   }
 }

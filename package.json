@@ -10,7 +10,8 @@
     "db:seed": "node db/run-seed.js",
     "scrape": "node src/scraper/scheduler.js",
     "import:portaly": "node src/scraper/import-portaly.js",
-    "db:migrate": "node db/run-migrate.js"
+    "db:migrate": "node db/run-migrate.js",
+    "data:cleanup": "node src/scripts/data-cleanup.js"
   },
   "engines": {
     "node": ">=18.0.0"
