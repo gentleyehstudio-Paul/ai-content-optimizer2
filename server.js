@@ -7,6 +7,8 @@ const { renderCategoryPage, CATEGORIES } = require('./src/templates/category');
 const { renderDetailPage } = require('./src/templates/detail');
 const { renderPage, headerHTML, footerHTML, SITE_URL, SLUG_MAP, TABLE_TO_SLUG } = require('./src/templates/layout');
 const { aboutPage, partnersPage, privacyPage } = require('./src/templates/pages');
+const { renderArticlePage, renderJournalListPage } = require('./src/templates/journal');
+const { getArticleBySlug, getAllArticles } = require('./src/data/journal-articles');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -35,6 +37,13 @@ app.get('/sitemap.xml', async (req, res) => {
       { loc: '/partners', priority: '0.5', changefreq: 'monthly' },
       { loc: '/privacy', priority: '0.3', changefreq: 'yearly' },
     ];
+
+    // Journal pages
+    urls.push({ loc: '/journal', priority: '0.7', changefreq: 'weekly' });
+    const journalArticles = getAllArticles().filter(a => a.published);
+    journalArticles.forEach(a => {
+      urls.push({ loc: a.url, priority: '0.6', changefreq: 'monthly' });
+    });
 
     for (const [table, slug] of Object.entries(TABLE_TO_SLUG)) {
       urls.push({ loc: `/${slug}`, priority: '0.8', changefreq: 'weekly' });
@@ -81,6 +90,21 @@ app.get('/detail/:type/:id', (req, res) => {
 app.get('/about', (req, res) => { res.send(aboutPage()); });
 app.get('/partners', (req, res) => { res.send(partnersPage()); });
 app.get('/privacy', (req, res) => { res.send(privacyPage()); });
+
+// --- Journal (有鬆誌) ---
+
+app.get('/journal', (req, res) => {
+  const articles = getAllArticles();
+  res.send(renderJournalListPage(articles));
+});
+
+app.get('/journal/:slug', (req, res) => {
+  const article = getArticleBySlug(req.params.slug);
+  if (!article) return res.status(404).send(render404Page());
+  const html = renderArticlePage(article);
+  if (!html) return res.status(404).send(render404Page());
+  res.send(html);
+});
 
 // --- New slug-based category routes ---
 

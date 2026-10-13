@@ -98,6 +98,7 @@ function headerHTML({ solid } = {}) {
       <a href="/places">場地</a>
       <a href="/teachers">師資</a>
       <a href="/herbs">草本</a>
+      <a href="/journal">有鬆誌</a>
       <a href="/about">關於</a>
     </nav>
   </header>`;
@@ -114,6 +115,7 @@ function footerHTML() {
         <a href="/places">場地</a>
         <a href="/teachers">師資</a>
         <a href="/herbs">草本</a>
+        <a href="/journal">有鬆誌</a>
         <a href="/about">關於我們</a>
         <a href="/partners">合作夥伴</a>
         <a href="/privacy">隱私政策</a>
