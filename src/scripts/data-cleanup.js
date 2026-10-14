@@ -82,7 +82,7 @@ async function run() {
       const fields = Object.keys(venue);
       const values = fields.map(k => {
         const v = venue[k];
-        return Array.isArray(v) ? JSON.stringify(v) : v;
+        return Array.isArray(v) ? `{${v.join(',')}}` : v;
       });
       const placeholders = fields.map((_, i) => `$${i + 1}`);
       const { rows } = await pool.query(
@@ -99,11 +99,14 @@ async function run() {
   console.log('\n5. Checking region normalization...');
   for (const table of ['venues', 'facilitators']) {
     try {
-      const { rows } = await pool.query(`SELECT id, name, region, address FROM ${table} WHERE region IS NOT NULL`);
+      const hasAddress = table === 'venues';
+      const cols = hasAddress ? 'id, name, region, address' : 'id, name, region';
+      const { rows } = await pool.query(`SELECT ${cols} FROM ${table} WHERE region IS NOT NULL`);
       console.log(`  ${table}: ${rows.length} items with region`);
       rows.forEach(r => {
         const regionOk = /^.{2,3}[市縣].+[區鄉鎮市]$/.test(r.region || '');
-        console.log(`    id=${r.id}: ${r.name} → region="${r.region}" ${regionOk ? '✓' : '⚠ 需確認'} | address="${r.address || '(無)'}"`);
+        const addr = hasAddress ? ` | address="${r.address || '(無)'}"` : '';
+        console.log(`    id=${r.id}: ${r.name} → region="${r.region}" ${regionOk ? '✓' : '⚠ 需確認'}${addr}`);
       });
     } catch (err) {
       console.error(`  Error:`, err.message);
