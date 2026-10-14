@@ -79,6 +79,13 @@ async function run() {
 
   for (const venue of newVenues) {
     try {
+      const { rows: existing } = await pool.query(
+        `SELECT id FROM venues WHERE name = $1`, [venue.name]
+      );
+      if (existing.length > 0) {
+        console.log(`  Skipped (already exists): ${venue.name} (id: ${existing[0].id})`);
+        continue;
+      }
       const fields = Object.keys(venue);
       const values = fields.map(k => {
         const v = venue[k];
