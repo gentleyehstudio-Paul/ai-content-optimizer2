@@ -13,8 +13,8 @@ const articles = [
     readingTime: '約 4 分鐘',
     featured: true,
     published: false,
-    coverImage: '',
-    coverImageAlt: '淡藍色的清晨，晨跑員在飯店大廳外暖身',
+    coverImage: '/assets/images/journal/morning-run-cover.jpg',
+    coverImageAlt: '淡藍色清晨，旅客與晨跑引導員在山林旅宿外暖身',
     relatedTrip: '',
     relatedStories: [
       { slug: 'what-is-wellness-trip', title: '什麼是 Wellness Trip？台灣身心靈旅行入門指南', status: 'upcoming' },
@@ -55,14 +55,14 @@ const articles = [
         content: '到了上坡，他只說：照自己的能力就好。想挑戰的人可以在這段做幾趟短衝，喘到說不出話，再慢慢走回起點；想慢的人就穩穩地踩。我選了三趟。心跳衝上去的那幾十秒，腦袋是空的，只剩下腿和肺——那種乾淨的快感，很難在跑步機上找到。',
       },
       {
-        type: 'image',
-        alt: '晨跑員在視野打開的地方放慢腳步，讓大家站一會兒。',
-        caption: '轉過最後一個彎，山稜線出現',
-        src: '',
-      },
-      {
         type: 'heading',
         content: '讓風景接手',
+      },
+      {
+        type: 'image',
+        alt: '晨跑引導員與旅客停在山路轉彎處眺望晨霧山稜',
+        caption: '轉過最後一個彎，山稜線出現',
+        src: '/assets/images/journal/morning-run-ridgeline.jpg',
       },
       {
         type: 'paragraph',
@@ -73,12 +73,24 @@ const articles = [
         content: '回到飯店：酸種、蔬食、一杯淺焙',
       },
       {
+        type: 'image',
+        alt: '晨跑後的酸種麵包、當季蔬食與淺焙手沖咖啡',
+        caption: '跑完後的早餐，明亮的果酸接住身體',
+        src: '/assets/images/journal/morning-run-breakfast.jpg',
+      },
+      {
         type: 'paragraph',
         content: '梳洗完，早餐剛好登場。一片烤得微焦的酸種麵包、幾樣當季蔬食，配一杯手沖淺焙，明亮的果酸正好接住剛跑完的身體。我沒有急著滑手機，只是慢慢吃。',
       },
       {
         type: 'heading',
         content: '半室外露台，開始瑜伽',
+      },
+      {
+        type: 'image',
+        alt: '旅客在半室外露台進行跑後腿部伸展與呼吸練習',
+        caption: '風從欄杆間穿過，鳥叫聲比任何音樂都適合當背景',
+        src: '/assets/images/journal/morning-run-yoga.jpg',
       },
       {
         type: 'paragraph',

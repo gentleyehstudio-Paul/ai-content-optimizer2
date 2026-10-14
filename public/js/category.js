@@ -112,7 +112,14 @@ function renderGrid(items) {
   noResults.style.display = 'none';
   grid.style.display = '';
 
-  items.forEach((item, i) => {
+  let displayItems = items;
+  if (type === 'herbals' && items.length > 0 && items.length < 4) {
+    const base = [...items];
+    while (displayItems.length < 4) displayItems = displayItems.concat(base);
+    displayItems = displayItems.slice(0, 6);
+  }
+
+  displayItems.forEach((item, i) => {
     const card = document.createElement('a');
     card.className = 'ys-card ys-in';
     card.href = `/${slug}/${item.id}`;

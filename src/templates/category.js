@@ -13,7 +13,14 @@ function renderCategoryPage(type, items) {
 
   const slug = TABLE_TO_SLUG[type];
 
-  const itemCards = (items || []).map((item, i) => {
+  let displayItems = items || [];
+  if (type === 'herbals' && displayItems.length > 0 && displayItems.length < 4) {
+    const base = [...displayItems];
+    while (displayItems.length < 4) displayItems = displayItems.concat(base);
+    displayItems = displayItems.slice(0, 6);
+  }
+
+  const itemCards = displayItems.map((item, i) => {
     const desc = item[cat.descKey] || item.description || '';
     const secondary = item[cat.secondaryKey] || '';
     const imgSrc = item.image_url || cat.defaultImg;
@@ -125,8 +132,8 @@ function renderCategoryPage(type, items) {
 
       <main class="ys-main">
         ${items && items.length > 0
-          ? `<div id="grid" class="ys-grid">${itemCards}</div>`
-          : `<div id="grid" class="ys-grid" style="display:none"></div>`}
+          ? `<div id="grid" class="ys-grid${type === 'herbals' ? ' ys-grid--herbals' : ''}">${itemCards}</div>`
+          : `<div id="grid" class="ys-grid${type === 'herbals' ? ' ys-grid--herbals' : ''}" style="display:none"></div>`}
         <div id="loading" class="ys-loading" style="display:none">載入中⋯</div>
         <div id="empty" class="ys-empty" style="${!items || items.length === 0 ? '' : 'display:none'}">
           ${type === 'ingredients'

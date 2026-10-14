@@ -148,6 +148,11 @@ nav.ys-nav a:hover { color: var(--white); }
   display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
   gap: clamp(20px, 3vw, 40px); padding: clamp(48px, 8vh, 80px) 0;
 }
+.ys-grid--herbals {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: clamp(14px, 2vw, 24px);
+}
+.ys-grid--herbals .ys-card-image img { height: 180px; }
 
 .ys-detail-hero {
   position: relative; min-height: 50vh; display: flex;
