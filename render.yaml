@@ -3,7 +3,7 @@ services:
     name: yousong-island
     runtime: node
     repo: https://github.com/gentleyehstudio-Paul/ai-content-optimizer2
-    branch: claude/yousong-island-dev-v33ey7
+    branch: main
     buildCommand: npm install
     startCommand: node server.js
     envVars:
