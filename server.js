@@ -18,6 +18,42 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/api', apiRoutes);
 
+// --- Debug: check if image files exist on deploy ---
+app.get('/api/debug/images', (req, res) => {
+  const fs = require('fs');
+  const imgDir = path.join(__dirname, 'public', 'assets', 'images', 'journal');
+  const publicDir = path.join(__dirname, 'public');
+  const result = {
+    cwd: process.cwd(),
+    __dirname,
+    publicDirExists: fs.existsSync(publicDir),
+    imgDirExists: fs.existsSync(imgDir),
+    files: [],
+  };
+  if (result.imgDirExists) {
+    result.files = fs.readdirSync(imgDir).map(f => {
+      const stat = fs.statSync(path.join(imgDir, f));
+      return { name: f, size: stat.size, isFile: stat.isFile() };
+    });
+  }
+  try {
+    result.allPublicImages = [];
+    const walkDir = path.join(__dirname, 'public', 'assets', 'images');
+    if (fs.existsSync(walkDir)) {
+      const dirs = fs.readdirSync(walkDir, { withFileTypes: true });
+      dirs.forEach(d => {
+        if (d.isDirectory()) {
+          const sub = fs.readdirSync(path.join(walkDir, d.name));
+          sub.forEach(f => result.allPublicImages.push(`${d.name}/${f}`));
+        } else {
+          result.allPublicImages.push(d.name);
+        }
+      });
+    }
+  } catch (e) { result.walkError = e.message; }
+  res.json(result);
+});
+
 // --- robots.txt & sitemap ---
 
 app.get('/robots.txt', (req, res) => {
