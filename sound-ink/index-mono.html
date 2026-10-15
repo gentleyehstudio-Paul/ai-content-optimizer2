@@ -1,0 +1,936 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>聲墨生花 灰白水墨版</title>
+<style>
+  :root{
+    --void:#05030a; --purple:#2a1450; --violet:#5b2a9a; --gold:#d4a843; --gold-hi:#f5dd9a; --white:#f3eee2;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;background:var(--void);color:var(--white);
+    font-family:"Noto Serif TC","Songti TC",serif;overflow:hidden;-webkit-user-select:none;user-select:none}
+  #ov{pointer-events:none}
+  canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+  .hud{position:fixed;left:16px;right:16px;bottom:max(16px,env(safe-area-inset-bottom));
+    display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center;
+    opacity:.85;transition:opacity .6s}
+  body.idle .hud{opacity:0}
+  button{font:inherit;font-size:14px;color:var(--gold-hi);background:rgba(42,20,80,.45);
+    border:1px solid rgba(212,168,67,.45);border-radius:999px;padding:8px 16px;cursor:pointer;
+    backdrop-filter:blur(6px);transition:background .2s,border-color .2s}
+  button:hover{background:rgba(91,42,154,.55);border-color:var(--gold)}
+  button.on{background:rgba(212,168,67,.22);border-color:var(--gold);color:var(--white)}
+  button:focus-visible{outline:2px solid var(--gold-hi);outline-offset:2px}
+  .sep{width:1px;height:20px;background:rgba(212,168,67,.3);margin:0 4px}
+  .info{position:fixed;top:max(16px,env(safe-area-inset-top));left:16px;right:16px;
+    display:flex;justify-content:space-between;gap:12px;font-size:13px;letter-spacing:.12em;
+    color:rgba(243,238,226,.6);pointer-events:none}
+  .info b{color:var(--gold-hi);font-weight:400}
+  .title{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;pointer-events:none;transition:opacity 1.6s;padding:0 24px}
+  .title h1{font-weight:400;font-size:clamp(28px,6vw,56px);letter-spacing:.4em;color:var(--gold-hi);padding-left:.4em}
+  .title p{margin-top:16px;font-size:14px;letter-spacing:.2em;color:rgba(243,238,226,.55);line-height:1.9}
+  body.started .title{opacity:0}
+  body.paper{background:#e7dfca;color:#16120c}
+  body.paper .info{color:rgba(22,18,12,.6)} body.paper .info b{color:#16120c}
+  body.paper .title h1{color:#16120c} body.paper .title p{color:rgba(22,18,12,.6)}
+  body.paper button{color:#16120c;background:rgba(231,223,202,.6);border-color:rgba(22,18,12,.4)}
+  body.paper button.on{background:rgba(22,18,12,.14);border-color:#16120c}
+  #rec{color:#d4452e}
+  #saveBar{position:fixed;left:50%;top:max(56px,env(safe-area-inset-top));transform:translateX(-50%);display:flex;gap:8px;align-items:center;z-index:9;
+    flex-wrap:wrap;justify-content:center;width:max-content;max-width:calc(100% - 24px);padding:10px 14px;border-radius:20px;background:rgba(5,3,10,.85);border:1px solid rgba(212,168,67,.5);font-size:13px;color:#f3eee2}
+  #saveBar[hidden]{display:none}
+  #saveBar span,#saveBar button{white-space:nowrap}
+  #msg{position:fixed;top:48px;left:0;right:0;text-align:center;font-size:13px;color:#e8a0a0;pointer-events:none}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<canvas id="ov"></canvas>
+
+<div class="title">
+  <h1>聲 墨 生 花</h1>
+  <p style="margin-top:0;letter-spacing:.4em">灰 白 水 墨 版</p>
+  <p>以颂钵的頻率作墨，讓聲音自己長出畫面<br>點一下螢幕開始聆聽環境音<br>聲音出現的時候，畫面自然生成</p>
+</div>
+
+<div class="info">
+  <span>模式 <b id="iMode">—</b></span>
+  <span><b id="iFreq">—</b> Hz</span>
+</div>
+<div id="msg"></div>
+<div id="saveBar" hidden><span>已完成</span> <button id="bAlbum">儲存到相簿</button> <button id="bDl">下載</button> <button id="bX">關閉</button></div>
+
+<div class="hud">
+  <button id="bGo">一鍵創作</button>
+  <span class="sep"></span>
+  <button id="bMic">開啟麥克風</button>
+  <button id="bDemo">示範颂钵</button>
+  <button id="bCam">開啟鏡頭</button>
+  <span class="sep"></span>
+  <button data-mode="auto" class="on">自動</button>
+  <button data-mode="meditation">冥想</button>
+  <button data-mode="flow">流動</button>
+  <button data-mode="pulse">躍動</button>
+  <button data-mode="harmonic">共鳴</button>
+  <span class="sep"></span>
+  <button id="bTheme">宣紙</button>
+  <button id="bObj">物件追蹤</button>
+  <button id="bTag">標註</button>
+  <button id="bRec">錄影</button>
+  <button id="bFreeze">凍結</button>
+  <button id="bSave">存為 PNG</button>
+  <button id="bClear">清空</button>
+</div>
+
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+const cv = $('c'), ctx = cv.getContext('2d');
+const ov = $('ov'), octx = ov.getContext('2d');
+const ex = document.createElement('canvas'), ectx = ex.getContext('2d'); // 匯出用：底圖 + 標註層合成
+let W = 0, H = 0, DPR = 1, CX = 0, CY = 0, R = 0;
+
+let paper = false;
+const bgRGB = () => paper ? '231,223,202' : '5,3,10';
+function paintBg(a){ ctx.globalCompositeOperation='source-over'; ctx.fillStyle=`rgba(${bgRGB()},${a})`; ctx.fillRect(0,0,W,H); }
+const comp = () => paper ? 'source-over' : 'lighter';
+
+function resize(){
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = innerWidth; H = innerHeight;
+  cv.width = W*DPR; cv.height = H*DPR;
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  ov.width = cv.width; ov.height = cv.height; octx.setTransform(DPR,0,0,DPR,0,0);
+  CX = W/2; CY = H/2; R = Math.min(W,H)*0.42;
+  paintBg(1);
+}
+addEventListener('resize', resize); resize();
+
+/* ---------------- Audio ---------------- */
+let ac = null, analyser = null, freqData = null, srcNode = null, micStream = null;
+let demoBus = null, demoOn = false, recDest = null;
+const FFT = 8192;
+
+function ensureAudio(){
+  if (!ac){
+    ac = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = ac.createAnalyser();
+    analyser.fftSize = FFT;
+    analyser.smoothingTimeConstant = 0.6;
+    analyser.minDecibels = -95; analyser.maxDecibels = -20;
+    freqData = new Uint8Array(analyser.frequencyBinCount);
+    demoBus = ac.createGain(); demoBus.gain.value = 0.9;
+    recDest = ac.createMediaStreamDestination();
+    demoBus.connect(recDest);
+    demoBus.connect(analyser);               // 分析用
+    const out = ac.createGain(); out.gain.value = 0.7;
+    demoBus.connect(out); out.connect(ac.destination); // 可聽見
+  }
+  if (ac.state === 'suspended') ac.resume();
+}
+
+function say(t){ const m = $('msg'); m.textContent = t || ''; if (t) setTimeout(()=>{ if(m.textContent===t) m.textContent=''; }, 4000); }
+
+async function toggleMic(){
+  ensureAudio();
+  if (micStream){
+    micStream.getTracks().forEach(t=>t.stop()); srcNode.disconnect(); micStream = srcNode = null;
+    $('bMic').classList.remove('on'); $('bMic').textContent = '開啟麥克風'; return;
+  }
+  try{
+    // 關閉語音處理，保留颂钵原始泛音
+    micStream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
+    srcNode = ac.createMediaStreamSource(micStream);
+    srcNode.connect(analyser); srcNode.connect(recDest);              // 不接 destination，避免回授
+    $('bMic').classList.add('on'); $('bMic').textContent = '麥克風運作中';
+    document.body.classList.add('started');
+  }catch(e){ say('無法使用麥克風：' + (e.message||e.name)); }
+}
+
+// 颂钵近似：非整數倍泛音 + 拍頻（雙正弦微失諧）
+const BOWL = [[1,1],[2.71,.5],[5.15,.28],[8.46,.12]];
+// 示範用（「示範颂钵」按鈕）：合成一聲缽響，由分析器像聽環境音一樣偵測
+function strike(f0){
+  ensureAudio();
+  document.body.classList.add('started');
+  f0 = f0 || [196,220,261.6,293.7,329.6,392][Math.random()*6|0];
+  const t = ac.currentTime;
+  BOWL.forEach(([r,a],i)=>{
+    [0, 1.3+i*.4].forEach((beat,k)=>{
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.type = 'sine'; o.frequency.value = f0*r + beat;
+      const dur = 7 - i*1.2;
+      g.gain.setValueAtTime(0,t);
+      g.gain.linearRampToValueAtTime(a*.22/(k+1), t+.012);
+      g.gain.exponentialRampToValueAtTime(.0001, t+dur);
+      o.connect(g); g.connect(demoBus); o.start(t); o.stop(t+dur+.1);
+    });
+  });
+}
+
+/* ---------------- Analysis ---------------- */
+const state = {
+  rms:0, energy:0, freq:0, centroid:0, flux:0, onset:0, peaks:[], hue:0.5, prev:null
+};
+let binHz = 0;
+
+function analyse(){
+  if (!analyser) { state.energy *= .96; state.onset *= .93; state.peaks = []; return; }
+  analyser.getByteFrequencyData(freqData);
+  binHz = ac.sampleRate / FFT;
+  const lo = Math.max(2, 60/binHz|0), hi = Math.min(freqData.length-2, 5000/binHz|0);
+  let sum=0, wsum=0, flux=0, maxV=0;
+  if (!state.prev) state.prev = new Float32Array(freqData.length);
+  for (let i=lo;i<hi;i++){
+    const v = freqData[i]/255;
+    sum += v*v; wsum += v*i*binHz; maxV = Math.max(maxV,v);
+    const d = v - state.prev[i]; if (d>0) flux += d;
+    state.prev[i] = v;
+  }
+  const rms = Math.sqrt(sum/(hi-lo));
+  state.rms = rms;
+  // 環境音：自適應底噪（上升慢、下降快），只有高於底噪的聲音才算「偵測到」。
+  // 安靜時畫面沉寂；有人聲、敲擊、缽聲、拍手等環境音出現時，畫面隨之生成。
+  if (state.floor === undefined){ state.floor = rms; state.rmsSlow = rms; }
+  state.floor += (rms - state.floor) * (rms < state.floor ? .05 : .003);
+  const lvl = Math.max(0, rms - state.floor*1.15 - .005);
+  const rise = rms - state.rmsSlow; state.rmsSlow += (rms - state.rmsSlow) * .1;
+  state.level = lvl;
+  state.energy += (Math.min(1, lvl*5) - state.energy) * .1;
+  const vs = Math.max(1e-6, wsum), tot = Math.max(1e-6, (()=>{let s=0;for(let i=lo;i<hi;i++)s+=freqData[i]/255;return s;})());
+  state.centroid += (vs/tot - state.centroid) * .1;
+  flux /= (hi-lo);
+  state.flux = flux;
+  // 起音：聲音突然高於底噪（取代原本的「觸碰螢幕敲缽」）
+  if (lvl > .02 && rise > .01 && state.onset < .3) state.onset = Math.min(1, .5 + lvl*6);
+  else if (lvl > .01 && flux > .012 && flux > state.onset*.04) state.onset = Math.min(1, state.onset + flux*18);
+  state.onset *= .94;
+
+  // 峰值：局部極大、高於門檻、彼此至少 4 bin
+  const cand = [];
+  const thr = 90;
+  for (let i=lo+1;i<hi-1;i++){
+    const v = freqData[i];
+    if (v>thr && v>=freqData[i-1] && v>freqData[i+1]) cand.push(i);
+  }
+  cand.sort((a,b)=>freqData[b]-freqData[a]);
+  const peaks = [];
+  for (const i of cand){
+    if (peaks.length>=5) break;
+    if (peaks.every(p=>Math.abs(p.bin-i)>4)){
+      // 拋物線內插求精確頻率
+      const a=freqData[i-1], b=freqData[i], c=freqData[i+1];
+      const off = (a-c) / (2*(a-2*b+c) || 1);
+      peaks.push({bin:i, f:(i+off)*binHz, a:b/255});
+    }
+  }
+  state.peaks = peaks;
+  if (peaks.length){
+    const f = peaks[0].f;
+    state.freq += ((f) - state.freq) * (state.freq? .15 : 1);
+    // 100–1000 Hz 對映至 0..1（對數）
+    const t = Math.min(1, Math.max(0, Math.log2(state.freq/100)/Math.log2(10)));
+    state.hue += (t - state.hue) * .05;
+  }
+}
+
+/* ---------------- Visual mode ---------------- */
+const MODES = {meditation:'冥想', flow:'流動', pulse:'躍動', harmonic:'共鳴'};
+let manual = 'auto', mode = 'meditation', modeSince = 0;
+
+function pickMode(now){
+  if (manual !== 'auto'){ mode = manual; return; }
+  let want = 'meditation';
+  if (state.onset > .45) want = 'pulse';
+  else if (state.peaks.length >= 3 && state.energy > .15) want = 'harmonic';
+  else if (state.energy > .3) want = 'flow';
+  const hold = want === 'pulse' ? 0 : 2200;      // 擊缽立即響應，其餘需停留避免閃爍
+  if (want !== mode && now - modeSince > hold){ mode = want; modeSince = now; }
+}
+
+/* ---------------- Color (Void Gold) ---------------- */
+function lerp(a,b,t){ return a+(b-a)*t; }
+// t: 0 深紫 → 0.55 紫羅蘭 → 1 金
+function inkColor(t, a, lift=0){
+  // 灰白水墨：所有會動的視覺（粒子、霧狀墨痕、墨染、物件/手部的墨）一律中性灰白，
+  // 音高只改變明度（低音深灰 → 高音近白）；宣紙模式則是由濃墨到淡灰墨。
+  const k = Math.min(1,Math.max(0,t));
+  if (paper){ const v = lerp(18,105,k)|0; return `rgba(${v},${v},${v},${Math.min(1,a*1.5)})`; }
+  const v = Math.min(255, lerp(140,246,k)+lift)|0;
+  return `rgba(${v},${v},${v},${a})`;
+}
+
+/* ---------------- Particles ---------------- */
+const N = 2600;
+const P = Array.from({length:N}, () => ({x:0,y:0,px:0,py:0,vx:0,vy:0,life:0,max:1,w:1,seed:Math.random(),burst:0}));
+function spawn(p, burst){
+  if (burst){
+    const a = Math.random()*Math.PI*2, s = (.8+Math.random()*3.2)*burst;
+    p.x = CX + Math.cos(a)*R*.04; p.y = CY + Math.sin(a)*R*.04;
+    p.vx = Math.cos(a)*s; p.vy = Math.sin(a)*s;
+    p.max = 60+Math.random()*90; p.w = 1+Math.random()*2.2; p.burst = 1;
+  } else {
+    const a = Math.random()*Math.PI*2, d = Math.sqrt(Math.random())*R*1.15;
+    p.x = CX + Math.cos(a)*d; p.y = CY + Math.sin(a)*d;
+    p.vx = p.vy = 0; p.max = 90+Math.random()*180; p.w = .5+Math.random()*1.1; p.burst = 0;
+  }
+  p.px = p.x; p.py = p.y; p.life = 0;
+}
+P.forEach(p => { spawn(p); p.life = p.max; });
+
+// 便宜的向量場（疊加正弦）
+function field(x,y,t){
+  const s = .0032;
+  return Math.sin(x*s + t*.2)*1.7 + Math.cos(y*s*1.3 - t*.15)*1.7 + Math.sin((x+y)*s*.7 + t*.1);
+}
+
+let T = 0, burstQueue = 0, frozen = false;
+function step(now){
+  const dt = 1;
+  const bg = !camStream;   // 開啟鏡頭後不畫背景（粒子流/諧波環/墨暈），畫面只剩鏡頭生成的墨影像
+  T += .016;
+  const e = state.energy;
+  // 殘影：能量越低，墨保留越久（冥想時像濕墨緩慢暈開）
+  const fade = camStream ? .12 : mode==='meditation' ? .035 : mode==='flow' ? .05 : .07;
+  ctx.globalCompositeOperation = 'source-over';
+  paintBg(paper ? .15 : fade);   // 8-bit 取整會讓小 alpha 留下殘影，宣紙需較大淡出量
+
+  const baseT = state.hue;
+  const speed = mode==='meditation' ? .35 : mode==='flow' ? .9 : mode==='pulse' ? 1.2 : .6;
+  const gain = 1 + e*3;
+
+  // 擊缽：湧出墨暈
+  if (bg && state.onset > .5 && burstQueue <= 0){ burstQueue = 220; blot(baseT); }
+  let toBurst = Math.min(burstQueue, 60); burstQueue -= toBurst;
+
+  ctx.globalCompositeOperation = comp();
+  ctx.lineCap = 'round';
+  for (let i=0;bg && i<N;i++){
+    const p = P[i];
+    if (p.life >= p.max){
+      if (toBurst>0){ spawn(p, 1+state.onset*1.5); toBurst--; } else spawn(p);
+    }
+    const ang = field(p.x,p.y,T)*(mode==='flow'?1.3:1);
+    // 冥想：緩慢環繞中心；躍動：向外；共鳴：沿圓環
+    const dx = p.x-CX, dy = p.y-CY, d = Math.hypot(dx,dy)+.001;
+    let ax = Math.cos(ang), ay = Math.sin(ang);
+    if (mode==='meditation'){ ax += -dy/d*.5; ay += dx/d*.5; }
+    else if (mode==='pulse'){ ax += dx/d*.8; ay += dy/d*.8; }
+    else if (mode==='harmonic'){ ax += -dy/d*1.2 - dx/d*.0; ay += dx/d*1.2; }
+    const k = p.burst ? .04 : .12*gain*speed;
+    p.vx = p.vx*(p.burst?.965:.9) + ax*k;
+    p.vy = p.vy*(p.burst?.965:.9) + ay*k;
+    p.px = p.x; p.py = p.y;
+    p.x += p.vx*dt*(p.burst?1:speed*2.2); p.y += p.vy*dt*(p.burst?1:speed*2.2);
+    p.life++;
+
+    const lf = p.life/p.max, fadeIO = Math.min(1, lf*6)*(1-lf);
+    const t = Math.min(1, Math.max(0, baseT + (p.seed-.5)*.35 + (p.burst?.1:0)));
+    const alpha = fadeIO * (p.burst ? .55 : .28 + e*.5);
+    ctx.strokeStyle = inkColor(t, alpha, p.burst?25:0);
+    ctx.lineWidth = p.w * 1.6 * (p.burst ? (1-lf*.6) : 1) * (1 + e*1.5);
+    ctx.beginPath(); ctx.moveTo(p.px,p.py); ctx.lineTo(p.x,p.y); ctx.stroke();
+  }
+
+  if (camStream) camStrokes(baseT);
+  if (objOn) { objectInk(baseT); handInk(baseT); }
+  if (bg && (mode==='harmonic' || state.peaks.length>=2)) rings(baseT);
+  ctx.globalCompositeOperation = 'source-over';
+}
+
+// 墨暈：徑向漸層暈染
+function blot(t){
+  const r = R*(.25+Math.random()*.2) * (.6 + state.onset*.6);
+  const g = ctx.createRadialGradient(CX,CY,0,CX,CY,r);
+  g.addColorStop(0, inkColor(Math.min(1,t+.15), .22, 20));
+  g.addColorStop(.5, inkColor(t*.8, .10));
+  g.addColorStop(1, inkColor(0, 0));
+  const prev = ctx.globalCompositeOperation;
+  ctx.globalCompositeOperation = comp();
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(CX,CY,r,0,Math.PI*2); ctx.fill();
+  ctx.globalCompositeOperation = prev;
+}
+
+// 諧波同心圓：每個峰值一圈，半徑依泛音序，擾動依振幅
+function rings(t){
+  const pk = state.peaks.slice().sort((a,b)=>a.f-b.f);
+  ctx.lineWidth = 1;
+  pk.forEach((p,i)=>{
+    const rad = R*(.18 + i*.17);
+    const amp = p.a*R*.025*(1+state.onset);
+    const lobes = 3 + i*2;
+    ctx.strokeStyle = inkColor(Math.min(1, t+.18+i*.05), .10+p.a*.3, 0);
+    ctx.beginPath();
+    for (let a=0;a<=Math.PI*2+.05;a+=.05){
+      const rr = rad + Math.sin(a*lobes + T*(.6+i*.25))*amp;
+      const x = CX+Math.cos(a)*rr, y = CY+Math.sin(a)*rr;
+      a===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+  });
+}
+
+
+/* ---------------- 霧狀墨暈 Mist stamps ----------------
+   以預先繪好的柔邊徑向漸層貼圖，縮放/旋轉後蓋印，取代硬邊直線，
+   疊加後呈現霧狀水墨；顏色依音高分 24 階。 */
+const SPN = 24, SPR = 64;
+let sprites = [];
+function buildSprites(){
+  sprites = [];
+  for (let i=0;i<SPN;i++){
+    const c = document.createElement('canvas'); c.width = c.height = SPR;
+    const g = c.getContext('2d'), t = i/(SPN-1);
+    const gr = g.createRadialGradient(SPR/2,SPR/2,0,SPR/2,SPR/2,SPR/2);
+    gr.addColorStop(0, inkColor(t,.95)); gr.addColorStop(.45, inkColor(t,.38)); gr.addColorStop(1, inkColor(t,0));
+    g.fillStyle = gr; g.fillRect(0,0,SPR,SPR);
+    sprites.push(c);
+  }
+}
+function stamp(x,y,len,wid,ang,t,alpha){
+  const sp = sprites[Math.min(SPN-1,Math.max(0,t*SPN|0))];
+  const c = Math.cos(ang), s = Math.sin(ang), k = DPR/SPR;
+  ctx.globalAlpha = alpha;
+  ctx.setTransform(c*len*k, s*len*k, -s*wid*k, c*wid*k, x*DPR, y*DPR);
+  ctx.drawImage(sp,-SPR/2,-SPR/2);
+  ctx.setTransform(DPR,0,0,DPR,0,0); ctx.globalAlpha = 1;
+}
+
+/* ---------------- Camera → ink strokes (聲音調制) ----------------
+   鏡頭提供「形」（邊緣、動態），聲音提供「勢」：
+   能量→墨量與線長、擊缽→爆發加粗、音高→墨色、模式→筆走方向。 */
+let camStream = null, camVid = null, camMirror = false;
+const CW = 240; let CH = 0, camLum, camPrev, camGx, camGy, camFx, camFy, camAnchors = [];
+const camWork = document.createElement('canvas'), camCtx = camWork.getContext('2d', {willReadFrequently:true});
+const sstep = (a,b,x) => { const t = Math.max(0,Math.min(1,(x-a)/(b-a||1e-6))); return t*t*(3-2*t); };
+const hash = n => { const x = Math.sin(n*127.1+311.7)*43758.5453; return x-Math.floor(x); };
+
+function setupCam(){
+  const vw = camVid.videoWidth||1280, vh = camVid.videoHeight||720;
+  CH = Math.round(CW*vh/vw);
+  camWork.width = CW; camWork.height = CH;
+  const n = CW*CH;
+  camLum = new Float32Array(n); camPrev = new Float32Array(n);
+  camGx = new Float32Array(n); camGy = new Float32Array(n);
+  camFx = new Float32Array(n); camFy = new Float32Array(n);
+  camAnchors = [];
+  const st = 4;
+  for (let y=st;y<CH-st;y+=st) for (let x=st;x<CW-st;x+=st){
+    const i = y*CW+x;
+    camAnchors.push({x:x+(hash(i)-.5)*st*.9, y:y+(hash(i+9871)-.5)*st*.9, jl:.7+hash(i+777)*.7, ja:(hash(i+555)-.5)*.5, ph:hash(i+1234)*6.28});
+  }
+}
+async function toggleCam(){
+  if (camStream){
+    camStream.getTracks().forEach(t=>t.stop()); camStream = null; objs = []; hands = []; objOn = false;
+    $('bObj').classList.remove('on'); $('bObj').textContent = '物件追蹤';
+    $('bCam').classList.remove('on'); $('bCam').textContent = '開啟鏡頭'; return;
+  }
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}},audio:false});
+    camVid = camVid || Object.assign(document.createElement('video'), {muted:true, playsInline:true});
+    camVid.srcObject = stream; await camVid.play();
+    camMirror = (stream.getVideoTracks()[0].getSettings().facingMode || 'user') !== 'environment';
+    camStream = stream; setupCam();
+    document.body.classList.add('started');
+    $('bCam').classList.add('on'); $('bCam').textContent = '鏡頭運作中';
+  }catch(e){ say('無法使用鏡頭：' + (e.message||e.name)); }
+}
+
+function computeCam(){
+  camCtx.drawImage(camVid,0,0,CW,CH);
+  const d = camCtx.getImageData(0,0,CW,CH).data, n = CW*CH;
+  for (let i=0,p=0;p<n;i+=4,p++){ camPrev[p] = camLum[p]; camLum[p] = (d[i]*.299+d[i+1]*.587+d[i+2]*.114)/255; }
+  for (let y=1;y<CH-1;y++) for (let x=1;x<CW-1;x++){
+    const i = y*CW+x, L = camLum, M = camPrev;
+    camGx[i] = (L[i-CW+1]+2*L[i+1]+L[i+CW+1])-(L[i-CW-1]+2*L[i-1]+L[i+CW-1]);
+    camGy[i] = (L[i+CW-1]+2*L[i+CW]+L[i+CW+1])-(L[i-CW-1]+2*L[i-CW]+L[i-CW+1]);
+    // 動態：幀差的梯度當作流向，並加一點下沉的重力
+    const a = (j)=>Math.abs(L[j]-M[j])*8;
+    camFx[i] = (a(i-CW+1)+2*a(i+1)+a(i+CW+1))-(a(i-CW-1)+2*a(i-1)+a(i+CW-1));
+    camFy[i] = (a(i+CW-1)+2*a(i+CW)+a(i+CW+1))-(a(i-CW-1)+2*a(i-CW)+a(i-CW+1)) + .6;
+  }
+}
+const camAt = (arr,x,y) => arr[(y|0)*CW + (x|0)];
+
+let washC = null, washX = null, washImg = null;
+// 染：鏡頭明暗轉為墨色濃淡（宣紙＝暗處為墨；暗場＝亮處發光），濃度隨聲音能量與擊缽
+function camWash(baseT){
+  if (!washC){ washC = document.createElement('canvas'); washC.width = CW; washC.height = CH; washX = washC.getContext('2d'); washImg = washX.createImageData(CW,CH); }
+  const d = washImg.data, n = CW*CH, e = state.energy, on = state.onset;
+  const col = paper ? [22,18,12] : [lerp(120,236,baseT), lerp(120,236,baseT), lerp(120,236,baseT)];
+  for (let p=0,i=0;p<n;p++,i+=4){
+    const L = camLum[p], a = paper ? Math.pow(1-L,1.7) : Math.pow(L,2.2);
+    d[i]=col[0]; d[i+1]=col[1]; d[i+2]=col[2]; d[i+3]=a*255;
+  }
+  washX.putImageData(washImg,0,0);
+  const sc = Math.max(W/CW, H/CH), ox = (W-CW*sc)/2, oy = (H-CH*sc)/2;
+  ctx.globalAlpha = Math.min(.5, (paper ? .02 : .004) + e*(paper ? .22 : .07) + on*(paper ? .15 : .1));
+  ctx.save(); if (camMirror){ ctx.translate(W,0); ctx.scale(-1,1); }
+  ctx.drawImage(washC, ox, oy, CW*sc, CH*sc);
+  ctx.restore(); ctx.globalAlpha = 1;
+}
+
+function camStrokes(baseT){
+  computeCam();
+  camWash(baseT);
+  const e = state.energy, on = state.onset;
+  const sc = Math.max(W/CW, H/CH), ox = (W-CW*sc)/2, oy = (H-CH*sc)/2;
+  const thr = Math.max(.2, .9 - e*.55 - on*.35);          // 越響，越多線浮現
+  const gainInk = .07 + e*.8 + on*.6;                      // 靜時淡墨，聲響時濃
+  const lenK = sc*2.4*(1 + e*1.6 + on*2.4);
+  ctx.lineCap = 'round';
+  for (const a of camAnchors){
+    const gx = camAt(camGx,a.x,a.y), gy = camAt(camGy,a.x,a.y);
+    const mag = Math.hypot(gx,gy);
+    const edge = sstep(thr, thr+.6, mag);
+    if (edge < .04) continue;
+    const L = camAt(camLum,a.x,a.y);
+    const ink = Math.min(.85, edge*(.35+.65*(1-L))*gainInk);
+    if (ink < .03) continue;
+    let tx = -gy/(mag||1), ty = gx/(mag||1);               // 邊緣切線
+    const px = a.x*sc+ox, py = a.y*sc+oy;
+    const rx = px-CX, ry = py-CY, rd = Math.hypot(rx,ry)||1;
+    if (mode==='flow'){ const fx = camAt(camFx,a.x,a.y), fy = camAt(camFy,a.x,a.y), fm = Math.hypot(fx,fy);
+      if (fm>.05){ tx = tx*.4 + fx/fm*.6; ty = ty*.4 + fy/fm*.6; } }
+    else if (mode==='pulse'){ tx += rx/rd*(.6+on); ty += ry/rd*(.6+on); }
+    else if (mode==='harmonic'){ tx += -ry/rd*.9; ty += rx/rd*.9; }
+    else { tx += Math.sin(T*.4+a.ph)*.15; ty += Math.cos(T*.4+a.ph)*.15; }
+    const tm = Math.hypot(tx,ty)||1, len = lenK*(.5+edge)*a.jl*.5;
+    const sx = camMirror ? W-px : px, dx = (camMirror?-1:1)*tx/tm*len, dy = ty/tm*len;
+    const tt = Math.min(1,Math.max(0,baseT+(a.jl-1)*.2)), ang = Math.atan2(dy,dx);
+    stamp(sx, py, len*2.2, 3+ink*8*(1+on), ang, tt, Math.min(paper?.26:.12, ink*(paper?.3:.16)));    // 暗場用加法混色，須更淡          // 霧狀墨痕
+    if (a.jl > 1.2){                                                                    // 零星墨點
+      ctx.fillStyle = inkColor(tt, Math.min(.9, ink*1.2));
+      ctx.fillRect(sx+(hash(a.ph*91)-.5)*len*3, py+(hash(a.ph*37)-.5)*len*3, 1.6, 1.6);
+    }
+  }
+}
+
+
+/* ---------------- 標註網絡 Tracking tags ----------------
+   在鏡頭動態/邊緣最強處長出節點：小方框 + 程式碼式標籤 + 弧線連接。
+   節點數量隨聲音能量與擊缽增加；標籤數字即時顯示頻率與能量。
+   畫在獨立透明層（每幀清除），文字才不會被墨的殘影糊掉。 */
+let tagsOn = false, nodes = [], nodeId = 0, tagFrame = 0;
+const POOL = ['(loop (format t "~%"))','[loop (format t "~%")]','(dolist (x ink) (draw x))','(setf bowl (fft buf))','(let ((f peak)) (wash f))','(when onset (bloom))'];
+
+function updateNodes(){
+  const sc = Math.max(W/CW, H/CH), ox = (W-CW*sc)/2, oy = (H-CH*sc)/2;
+  const cand = [];
+  for (const a of camAnchors){
+    const fx = camAt(camFx,a.x,a.y), fy = camAt(camFy,a.x,a.y);
+    const sc2 = Math.hypot(fx,fy)*1.5 + Math.hypot(camAt(camGx,a.x,a.y),camAt(camGy,a.x,a.y))*.35;
+    if (sc2 > .5) cand.push({x:a.x*sc+ox, y:a.y*sc+oy, s:sc2});
+  }
+  cand.sort((a,b)=>b.s-a.s);
+  const want = 7 + (state.energy*14 + state.onset*10)|0, gap = Math.max(26, Math.min(W,H)*.045);
+  nodes.forEach(n => n.life -= 1);
+  for (const c of cand.slice(0,80)){
+    if (nodes.filter(n=>n.life>0).length >= want) break;
+    if (nodes.some(n => n.life>0 && Math.hypot(n.x-c.x,n.y-c.y) < gap)) continue;
+    nodes.push({x:c.x, y:c.y, life:45+Math.random()*40|0, max:85, id:nodeId++, txt:POOL[Math.random()*POOL.length|0], w:10+Math.random()*10, h:5+Math.random()*4});
+  }
+  nodes = nodes.filter(n => n.life > 0);
+}
+
+function drawTags(baseT){
+  octx.clearRect(0,0,W,H);
+  if (!camStream) return;
+  if (objOn){ drawObjects(performance.now()); drawHands(performance.now()); }
+  if (!tagsOn || objs.length || hands.length) return;   // 已有貼合的追蹤時，不再疊動態節點
+  if (tagFrame++ % 4 === 0) updateNodes();
+  const fs = Math.max(8, Math.min(W,H)*.012), mx = camMirror;
+  const fg = paper ? '22,18,12' : '243,238,226', acc = '212,69,46';
+  octx.font = `${fs}px ui-monospace,Menlo,monospace`; octx.textBaseline = 'top'; octx.lineWidth = .7;
+  const X = n => mx ? W-n.x : n.x;
+  const al = n => Math.min(1, n.life/12, (n.max-n.life)/6 + .2);
+  // 弧線：每個節點連最近的兩個
+  nodes.forEach(n => {
+    const near = nodes.filter(m=>m!==n).sort((a,b)=>Math.hypot(a.x-n.x,a.y-n.y)-Math.hypot(b.x-n.x,b.y-n.y)).slice(0,2);
+    near.forEach(m => {
+      const x1=X(n), y1=n.y, x2=X(m), y2=m.y, cx=(x1+x2)/2-(y2-y1)*.18, cy=(y1+y2)/2+(x2-x1)*.18;
+      octx.strokeStyle = `rgba(${fg},${.28*Math.min(al(n),al(m))})`;
+      octx.beginPath(); octx.moveTo(x1,y1); octx.quadraticCurveTo(cx,cy,x2,y2); octx.stroke();
+    });
+  });
+  nodes.forEach(n => {
+    const x = X(n), y = n.y, a = al(n);
+    octx.strokeStyle = `rgba(${fg},${.9*a})`; octx.strokeRect(x-n.w/2, y-n.h/2, n.w, n.h);
+    octx.fillStyle = `rgba(${acc},${.9*a})`; octx.fillRect(x-n.w/2, y-n.h/2, 3, n.h);   // 紅色標記
+    octx.fillStyle = `rgba(${fg},${.85*a})`;
+    octx.fillText(n.txt, x+n.w/2+3, y-fs);
+    const f = state.freq ? (state.freq*10+n.id).toFixed(1) : (16000+n.id).toFixed(1);
+    octx.fillText(`${f}  e=${state.energy.toFixed(2)}`, x+n.w/2+3, y);
+  });
+}
+
+
+/* ---------------- 物件追蹤 Object tracking ----------------
+   MediaPipe ObjectDetector（COCO 80 類，首次開啟才下載模型，約 7MB）。
+   每個物件：四角追蹤框 + 紅色標記 + 名稱/信心 + 即時頻率；物件之間以弧線相連；
+   物件中心長出霧狀墨暈，濃度隨聲音能量；擊缽時向外漣漪。
+   COCO 沒有「手」這個類別，手由「人」的框與下方的動態節點涵蓋。 */
+const MP_BASE = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
+const OBJ_MODEL = 'https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float16/1/efficientdet_lite0.tflite';
+let objOn = false, objDet = null, objLoading = false, objs = [], objSeen = 0, objLastVT = -1, objTs = 0, objLastRun = 0;
+const ZH = {person:'人',bowl:'缽',cup:'杯',bottle:'瓶','wine glass':'杯',vase:'花器',book:'書',laptop:'筆電','cell phone':'手機',chair:'椅',couch:'沙發',bed:'床','potted plant':'盆栽',clock:'鐘',scissors:'剪刀',keyboard:'鍵盤',mouse:'滑鼠',tv:'螢幕',cat:'貓',dog:'狗',bird:'鳥',umbrella:'傘',backpack:'背包',handbag:'手袋',spoon:'匙',knife:'刀',fork:'叉','dining table':'桌'};
+
+let visionP = null;
+function getVision(){
+  return visionP || (visionP = (async () => {
+    const mod = await import(MP_BASE + '/vision_bundle.mjs');
+    return {mod, fileset: await mod.FilesetResolver.forVisionTasks(MP_BASE + '/wasm')};
+  })().catch(e => { visionP = null; throw e; }));
+}
+async function makeTask(cls, extra){
+  const {mod, fileset} = await getVision();
+  const opts = delegate => ({runningMode:'VIDEO', ...extra, baseOptions:{...extra.baseOptions, delegate}});
+  try{ return await mod[cls].createFromOptions(fileset, opts('GPU')); }
+  catch(_){ return await mod[cls].createFromOptions(fileset, opts('CPU')); }
+}
+async function loadObjects(){
+  if ((objDet && handLm) || objLoading) return;
+  objLoading = true; $('bObj').textContent = '載入模型…';
+  const [o, h] = await Promise.allSettled([
+    objDet ? objDet : makeTask('ObjectDetector', {baseOptions:{modelAssetPath:OBJ_MODEL}, scoreThreshold:.35, maxResults:10}),
+    handLm ? handLm : makeTask('HandLandmarker', {baseOptions:{modelAssetPath:HAND_MODEL}, numHands:2})]);
+  if (o.status === 'fulfilled') objDet = o.value;
+  if (h.status === 'fulfilled') handLm = h.value;
+  if (!objDet && !handLm){
+    objOn = false; $('bObj').classList.remove('on'); $('bObj').textContent = '物件追蹤';
+    say('追蹤模型載入失敗：' + ((o.reason||h.reason).message||o.reason)); console.error(o.reason, h.reason);
+  } else {
+    if (!objDet) say('物件模型載入失敗，僅追蹤手部'); else if (!handLm) say('手部模型載入失敗，僅追蹤物件');
+    if (objOn) $('bObj').textContent = '物件追蹤中';
+  }
+  objLoading = false;
+}
+
+function detectObjects(now){
+  // 約 8 次/秒即可，物件框隨後以平滑逼近，避免拖慢主畫面
+  if (!objDet || !camVid || camVid.readyState < 2 || camVid.currentTime === objLastVT || now - objLastRun < 120) return;
+  objLastVT = camVid.currentTime; objLastRun = now;
+  objTs = Math.max(objTs+1, now);
+  let res; try{ res = objDet.detectForVideo(camVid, objTs); }catch(e){ return; }
+  const vw = camVid.videoWidth, vh = camVid.videoHeight, sc = Math.max(W/vw, H/vh), ox = (W-vw*sc)/2, oy = (H-vh*sc)/2;
+  if (!res.detections.length){ if (now - objSeen > 600) objs = []; return; }
+  objSeen = now;
+  const next = res.detections.map(d => {
+    const bb = d.boundingBox, c = d.categories[0];
+    let x = bb.originX*sc+ox, w = bb.width*sc; const y = bb.originY*sc+oy, h = bb.height*sc;
+    if (camMirror) x = W-x-w;
+    return {x, y, w, h, name:c.categoryName, score:c.score, id:0};
+  });
+  // 與上一輪同名且最近的框配對，平滑位置並保留 id
+  objs = next.map(n => {
+    let best = null, bd = Math.max(W,H)*.25;
+    objs.forEach(o => { if (o.name !== n.name) return; const d = Math.hypot(o.x+o.w/2-n.x-n.w/2, o.y+o.h/2-n.y-n.h/2); if (d < bd){ bd = d; best = o; } });
+    if (best){ const k = .5; n.x = best.x+(n.x-best.x)*k; n.y = best.y+(n.y-best.y)*k; n.w = best.w+(n.w-best.w)*k; n.h = best.h+(n.h-best.h)*k; n.id = best.id; n.nodes = best.nodes; n.gap = best.gap; }
+    else n.id = ++objId;
+    return n;
+  });
+}
+let objId = 0;
+
+function convexHull(pts){
+  const p = pts.slice().sort((a,b)=>a.x-b.x||a.y-b.y), cr = (o,a,b)=>(a.x-o.x)*(b.y-o.y)-(a.y-o.y)*(b.x-o.x);
+  const lo = [], up = [];
+  for (const q of p){ while (lo.length>=2 && cr(lo[lo.length-2],lo[lo.length-1],q)<=0) lo.pop(); lo.push(q); }
+  for (let i=p.length-1;i>=0;i--){ const q = p[i]; while (up.length>=2 && cr(up[up.length-2],up[up.length-1],q)<=0) up.pop(); up.push(q); }
+  up.pop(); lo.pop(); return lo.concat(up);
+}
+
+// 節點吸附：在物件框內，取鏡頭邊緣/動態最強的點，彼此保持間距 → 節點貼著物件的真實形狀
+function snapNodes(o, gap, cap){
+  const sc = Math.max(W/CW, H/CH), ox = (W-CW*sc)/2, oy = (H-CH*sc)/2;
+  const x0 = o.x-o.w*.02, x1 = o.x+o.w*1.02, y0 = o.y-o.h*.02, y1 = o.y+o.h*1.02, cand = [];
+  for (const a of camAnchors){
+    const px = a.x*sc+ox, py = a.y*sc+oy, sx = camMirror ? W-px : px;
+    if (sx<x0 || sx>x1 || py<y0 || py>y1) continue;
+    const m = Math.hypot(camAt(camGx,a.x,a.y),camAt(camGy,a.x,a.y)) + Math.hypot(camAt(camFx,a.x,a.y),camAt(camFy,a.x,a.y))*1.2;
+    if (m > .35) cand.push({x:sx, y:py, s:m});
+  }
+  cand.sort((a,b)=>b.s-a.s);
+  const out = [];
+  for (const c of cand){ if (out.length >= cap) break; if (out.every(q => Math.hypot(q.x-c.x,q.y-c.y) >= gap)) out.push(c); }
+  return out;
+}
+let objFrame = 0;
+const objGap = o => Math.max(12, Math.min(o.w,o.h)/7);
+
+function drawObjects(now){
+  detectObjects(now);
+  if (!objs.length) return;
+  objFrame++;
+  const fg = paper ? '22,18,12' : '243,238,226', acc = '212,69,46', e = state.energy, on = state.onset;
+  const fs = Math.max(8, Math.min(W,H)*.012);
+  octx.font = `${fs}px ui-monospace,Menlo,monospace`; octx.textBaseline = 'top'; octx.lineWidth = .8;
+  const cap = 8 + (e*16 + on*10)|0;
+  objs.forEach((o,oi) => {
+    o.gap = objGap(o);
+    if (!o.nodes || objFrame % 3 === 0) o.nodes = snapNodes(o, o.gap, cap);
+    const nd = o.nodes; if (nd.length < 2) return;
+    // 貼合形狀的細外緣（節點的凸包）
+    if (nd.length >= 3){
+      const h = convexHull(nd); octx.strokeStyle = `rgba(${fg},.3)`; octx.beginPath();
+      h.forEach((q,i) => i ? octx.lineTo(q.x,q.y) : octx.moveTo(q.x,q.y)); octx.closePath(); octx.stroke();
+    }
+    // 每個節點連最近的兩個
+    nd.forEach(n => {
+      nd.filter(m=>m!==n).sort((a,b)=>Math.hypot(a.x-n.x,a.y-n.y)-Math.hypot(b.x-n.x,b.y-n.y)).slice(0,2).forEach(m => {
+        octx.strokeStyle = `rgba(${fg},${.2+e*.3})`; octx.beginPath(); octx.moveTo(n.x,n.y);
+        octx.quadraticCurveTo((n.x+m.x)/2-(m.y-n.y)*.15,(n.y+m.y)/2+(m.x-n.x)*.15,m.x,m.y); octx.stroke();
+      });
+    });
+    nd.forEach((n,i) => {
+      const lab = i < 4, w = lab ? 9 : 5, hh = lab ? 5 : 3.5;
+      octx.strokeStyle = `rgba(${fg},.9)`; octx.strokeRect(n.x-w/2,n.y-hh/2,w,hh);
+      octx.fillStyle = `rgba(${acc},.95)`; octx.fillRect(n.x-w/2,n.y-hh/2,lab?3:2,hh);
+      if (!lab) return;
+      octx.fillStyle = `rgba(${fg},.85)`;
+      const f = state.freq ? (state.freq*10+o.id*7+i).toFixed(1) : (16000+o.id*7+i).toFixed(1);
+      octx.fillText(POOL[(o.id+i)%POOL.length], n.x+w/2+3, n.y-fs);
+      octx.fillText(`${f}  e=${e.toFixed(2)}`, n.x+w/2+3, n.y);
+    });
+    const top = nd.reduce((a,b)=>b.y<a.y?b:a);                                            // 名稱掛在最高的節點上
+    octx.fillStyle = `rgba(${acc},.95)`; octx.fillText(`${o.name}${ZH[o.name]?' '+ZH[o.name]:''} ${o.score*100|0}%`, top.x+6, top.y-fs*2.3);
+    if (on > .05){                                                                         // 擊缽漣漪
+      octx.strokeStyle = `rgba(${acc},${Math.min(1,on)*.6})`;
+      octx.beginPath(); octx.arc(o.x+o.w/2,o.y+o.h/2,Math.max(o.w,o.h)*(.4+(1-on)*.7),0,Math.PI*2); octx.stroke();
+    }
+  });
+}
+
+// 墨只落在物件的節點上（貼著形狀），不再大片暈開
+function objectInk(baseT){
+  const e = state.energy, on = state.onset;
+  objs.forEach((o,oi) => (o.nodes||[]).forEach((n,i) => {
+    const g = o.gap || 14;
+    stamp(n.x, n.y, g*(2+e*2+on*2), g*(1.2+e*1.2+on), hash(oi*31+i)*3.14+T*.1, Math.min(1,baseT+i*.02), Math.min(paper?.3:.16, .05+e*.2+on*.2));
+  }));
+}
+
+/* ---------------- 手部關鍵點 Hand landmarks ----------------
+   與物件偵測一起載入。21 個關節貼合手形：骨架細線 + 關節方框 + 指尖弧線；
+   墨沿骨架落下（粗細與濃度隨聲音）。不畫外緣輪廓線。 */
+const HAND_MODEL = 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
+let handLm = null, hands = [], handsSeen = 0, handLastVT = -1, handTs = 0;
+const BONES = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[9,10],[10,11],[11,12],[13,14],[14,15],[15,16],[17,18],[18,19],[19,20],[5,9],[9,13],[13,17],[0,17]];
+const TIPS = [4,8,12,16,20], LABELED = [0,4,8,12,16,20,5,9,13,17];
+
+function detectHands(now){
+  if (!handLm || !camVid || camVid.readyState < 2 || camVid.currentTime === handLastVT) return;
+  handLastVT = camVid.currentTime; handTs = Math.max(handTs+1, now);
+  let res; try{ res = handLm.detectForVideo(camVid, handTs); }catch(e){ return; }
+  const vw = camVid.videoWidth, vh = camVid.videoHeight, sc = Math.max(W/vw, H/vh), ox = (W-vw*sc)/2, oy = (H-vh*sc)/2;
+  if (!res.landmarks.length){ if (now - handsSeen > 250) hands = []; return; }
+  handsSeen = now;
+  const next = res.landmarks.map(lm => lm.map(q => { const px = q.x*vw*sc+ox; return {x: camMirror ? W-px : px, y: q.y*vh*sc+oy}; }));
+  hands = next.map(h => {
+    let best = null, bd = W*.3;
+    hands.forEach(o => { const d = Math.hypot(o[0].x-h[0].x, o[0].y-h[0].y); if (d < bd){ bd = d; best = o; } });
+    return best ? h.map((q,i) => ({x: best[i].x+(q.x-best[i].x)*.6, y: best[i].y+(q.y-best[i].y)*.6})) : h;
+  });
+}
+const handSize = h => Math.hypot(h[0].x-h[9].x, h[0].y-h[9].y) || 60;
+
+function drawHands(now){
+  detectHands(now);
+  if (!hands.length) return;
+  const fg = paper ? '22,18,12' : '243,238,226', acc = '212,69,46', e = state.energy, on = state.onset;
+  const fs = Math.max(8, Math.min(W,H)*.012);
+  octx.font = `${fs}px ui-monospace,Menlo,monospace`; octx.textBaseline = 'top'; octx.lineWidth = .8;
+  const arc = (a,b,al,bend) => {
+    octx.strokeStyle = `rgba(${fg},${al})`; octx.beginPath(); octx.moveTo(a.x,a.y);
+    octx.quadraticCurveTo((a.x+b.x)/2-(b.y-a.y)*bend,(a.y+b.y)/2+(b.x-a.x)*bend,b.x,b.y); octx.stroke();
+  };
+  hands.forEach((h,hi) => {
+    const size = handSize(h);
+    BONES.forEach(([a,b]) => arc(h[a],h[b],.5,0));
+    TIPS.forEach((t,k) => { arc(h[t],h[0],.2+e*.3,.22); if (k<4) arc(h[t],h[TIPS[k+1]],.2+e*.3,-.3); });
+    if (on > .05){ const c = h[9]; octx.strokeStyle = `rgba(${acc},${Math.min(1,on)*.7})`; octx.beginPath(); octx.arc(c.x,c.y,size*(.8+(1-on)*1.6),0,Math.PI*2); octx.stroke(); }
+    h.forEach((q,i) => {
+      const lab = LABELED.includes(i), w = lab ? 11 : 5, hh = lab ? 6 : 3.5;
+      octx.strokeStyle = `rgba(${fg},.9)`; octx.strokeRect(q.x-w/2,q.y-hh/2,w,hh);
+      octx.fillStyle = `rgba(${acc},.95)`; octx.fillRect(q.x-w/2,q.y-hh/2,lab?3:2,hh);
+      if (!lab) return;
+      octx.fillStyle = `rgba(${fg},.88)`;
+      const f = state.freq ? (state.freq*10+i+hi*21).toFixed(1) : (16000+i+hi*21).toFixed(1);
+      octx.fillText(POOL[i%POOL.length], q.x+w/2+3, q.y-fs);
+      octx.fillText(`${f}  e=${e.toFixed(2)}`, q.x+w/2+3, q.y);
+    });
+  });
+  if (hands.length === 2) TIPS.forEach(t => arc(hands[0][t],hands[1][t],.22+e*.3,.25));
+}
+
+// 墨沿著骨架落下：每段骨頭一團細長的霧
+function handInk(baseT){
+  const e = state.energy, on = state.onset;
+  hands.forEach(h => BONES.forEach(([a,b],i) => {
+    const A = h[a], B = h[b], len = Math.hypot(B.x-A.x,B.y-A.y);
+    stamp((A.x+B.x)/2, (A.y+B.y)/2, len*1.5, 8+e*22+on*18, Math.atan2(B.y-A.y,B.x-A.x), Math.min(1,baseT+i*.015), Math.min(paper?.3:.16, .05+e*.2+on*.2));
+  }));
+}
+
+buildSprites();
+
+/* ---------------- Loop & UI ---------------- */
+let lastInput = performance.now();
+function frame(now){
+  requestAnimationFrame(frame);
+  if (frozen) return;
+  analyse();
+  pickMode(now);
+  step(now);
+  drawTags(state.hue);
+  if (rec && rec.state === 'recording') composeExport();
+  $('iMode').textContent = MODES[mode];
+  $('iFreq').textContent = state.energy>.02 && state.freq ? state.freq.toFixed(1) : '—';
+  document.body.classList.toggle('idle', now - lastInput > 5000 && document.body.classList.contains('started'));
+}
+requestAnimationFrame(frame);
+
+function poke(){ lastInput = performance.now(); }
+['pointermove','pointerdown','keydown'].forEach(ev=>addEventListener(ev, poke));
+
+let micAsking = false;
+// 觸碰不再產生任何效果；第一次觸碰只負責開始聆聽（瀏覽器規定麥克風/聲音需由使用者手勢啟動）
+cv.addEventListener('pointerdown', () => {
+  if (micStream || micAsking) return;
+  micAsking = true; toggleMic().finally(() => micAsking = false);
+});
+
+$('bMic').onclick = toggleMic;
+$('bCam').onclick = toggleCam;
+$('bDemo').onclick = () => {
+  demoOn = !demoOn;
+  $('bDemo').classList.toggle('on', demoOn);
+  if (demoOn){ strike(); demoTimer = setInterval(()=>strike(), 6500); }
+  else clearInterval(demoTimer);
+};
+let demoTimer = 0;
+
+document.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => {
+  manual = b.dataset.mode;
+  document.querySelectorAll('[data-mode]').forEach(x=>x.classList.toggle('on', x===b));
+  if (manual!=='auto'){ mode = manual; }
+});
+
+$('bFreeze').onclick = () => {
+  frozen = !frozen;
+  $('bFreeze').classList.toggle('on', frozen);
+  $('bFreeze').textContent = frozen ? '繼續' : '凍結';
+};
+$('bClear').onclick = () => paintBg(1);
+$('bTheme').onclick = () => {
+  paper = !paper;
+  document.body.classList.toggle('paper', paper);
+  $('bTheme').textContent = paper ? '暗場' : '宣紙';
+  buildSprites(); paintBg(1);
+};
+
+$('bObj').onclick = () => {
+  if (!camStream){ say('物件追蹤需要先開啟鏡頭'); return; }
+  objOn = !objOn; $('bObj').classList.toggle('on', objOn);
+  if (objOn) loadObjects().then(()=>{ if (objDet || handLm) $('bObj').textContent = '物件追蹤中'; });
+  else { objs = []; hands = []; $('bObj').textContent = '物件追蹤'; }
+};
+function composeExport(){
+  if (ex.width !== cv.width) { ex.width = cv.width; ex.height = cv.height; }
+  ectx.setTransform(1,0,0,1,0,0);
+  ectx.drawImage(cv,0,0); ectx.drawImage(ov,0,0);
+}
+$('bTag').onclick = () => {
+  tagsOn = !tagsOn; $('bTag').classList.toggle('on', tagsOn);
+  if (tagsOn && !camStream) say('標註需要先開啟鏡頭');
+  if (!tagsOn){ octx.clearRect(0,0,W,H); nodes = []; }
+};
+
+/* ---- 存檔：手機走系統分享表（可「儲存影片/圖片」到相簿），桌機直接下載 ----
+   網頁無法在背景靜默寫入相簿；分享表是瀏覽器唯一允許的路徑（iOS Safari、Android Chrome）。 */
+const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.platform));
+let pendingFile = null;
+function downloadFile(file){
+  const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = file.name;
+  a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+function hideSaveBar(){ $('saveBar').hidden = true; pendingFile = null; }
+async function saveFile(blob, type, name){
+  const file = new File([blob], name, {type: type.split(';')[0]});   // 去掉 ;codecs=…，部分手機的分享表會因此拒絕
+  if (isMobile && navigator.canShare && navigator.canShare({files:[file]})){
+    try{ await navigator.share({files:[file], title:'聲墨生花'}); return; }
+    catch(e){ if (e.name === 'AbortError') return; }      // 使用者取消就不再打擾；其他失敗（如手勢逾時）→ 顯示儲存列，讓使用者再點一次
+    pendingFile = file; $('saveBar').hidden = false; return;
+  }
+  downloadFile(file);
+}
+$('bAlbum').onclick = async () => {
+  if (!pendingFile) return;
+  try{ await navigator.share({files:[pendingFile], title:'聲墨生花'}); hideSaveBar(); }
+  catch(e){ if (e.name !== 'AbortError'){ downloadFile(pendingFile); hideSaveBar(); } }
+};
+$('bDl').onclick = () => { if (pendingFile) downloadFile(pendingFile); hideSaveBar(); };
+$('bX').onclick = hideSaveBar;
+
+/* ---- 錄影（含聲音軌），沿用 Ink Engine 的 MediaRecorder 流程 ---- */
+let rec = null, recChunks = [], recTimer = 0, recStart = 0;
+function pickMime(){
+  for (const t of ['video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4;codecs=avc1','video/mp4;codecs=h264','video/mp4','video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'])
+    if (window.MediaRecorder && MediaRecorder.isTypeSupported(t)) return t;
+  return '';
+}
+function stopRec(){
+  $('bGo').classList.remove('on'); $('bGo').textContent = '一鍵創作';
+  if (rec && rec.state !== 'inactive') rec.stop();
+  clearInterval(recTimer);
+  $('bRec').classList.remove('on'); $('bRec').textContent = '錄影';
+}
+// 一鍵創作：麥克風 + 鏡頭 + 物件/手部追蹤 + 錄影（含聲音軌），再按一次停止並下載
+$('bGo').onclick = async () => {
+  if (rec && rec.state === 'recording') return stopRec();
+  if (!micStream) await toggleMic();
+  if (!camStream) await toggleCam();
+  if (camStream && !objOn) $('bObj').click();
+  $('bRec').click();
+  if (rec && rec.state === 'recording'){ $('bGo').classList.add('on'); $('bGo').textContent = '停止創作'; }
+};
+$('bRec').onclick = () => {
+  if (rec && rec.state === 'recording') return stopRec();
+  try{
+    ensureAudio();
+    document.body.classList.add('started');
+    composeExport();
+    const stream = ex.captureStream(30);
+    recDest.stream.getAudioTracks().forEach(t => stream.addTrack(t));
+    const mime = pickMime();
+    rec = new MediaRecorder(stream, mime ? {mimeType:mime, videoBitsPerSecond:8e6} : undefined);
+    recChunks = [];
+    rec.ondataavailable = e => { if (e.data && e.data.size) recChunks.push(e.data); };
+    rec.onstop = () => {
+      const type = rec.mimeType || mime || 'video/webm';
+      const blob = new Blob(recChunks, {type});
+      if (!blob.size) return say('錄影資料為空');
+      saveFile(blob, type, `sound-ink-${Date.now()}.${type.includes('mp4') ? 'mp4' : 'webm'}`);
+    };
+    rec.start(200); recStart = Date.now();
+    $('bRec').classList.add('on');
+    recTimer = setInterval(() => { const s = (Date.now()-recStart)/1000|0; $('bRec').textContent = `停止 ${s/60|0}:${String(s%60).padStart(2,'0')}`; }, 500);
+  }catch(e){ say('此瀏覽器不支援錄影'); }
+};
+$('bSave').onclick = () => {
+  composeExport();
+  ex.toBlob(b => saveFile(b, 'image/png', `sound-ink-${new Date().toISOString().replace(/[:.]/g,'-')}.png`), 'image/png');
+};
+
+
+// 供自動化測試使用
+window.__soundInk = { get objs(){return objs;}, get hands(){return hands;}, strike, state, get mode(){return mode;} };
+})();
+</script>
+</body>
+</html>
