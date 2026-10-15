@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>水墨光紋 - 圖片轉影片工具</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #000;
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 600px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 1.8em;
+            margin-bottom: 10px;
+            letter-spacing: 1px;
+        }
+
+        .subtitle {
+            color: #888;
+            margin-bottom: 40px;
+            font-size: 0.95em;
+        }
+
+        .upload-area {
+            border: 2px dashed #555;
+            border-radius: 8px;
+            padding: 40px 20px;
+            margin: 30px 0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .upload-area:hover {
+            border-color: #fff;
+            background: rgba(255,255,255,0.02);
+        }
+
+        .upload-area.drag-over {
+            border-color: #fff;
+            background: rgba(255,255,255,0.05);
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .file-info {
+            color: #aaa;
+            font-size: 0.9em;
+            margin: 20px 0;
+            min-height: 40px;
+            max-height: 100px;
+            overflow-y: auto;
+        }
+
+        .file-item {
+            padding: 5px 0;
+            border-bottom: 1px solid #333;
+        }
+
+        .file-item:last-child {
+            border-bottom: none;
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin: 30px 0;
+        }
+
+        .control-group {
+            text-align: left;
+        }
+
+        .control-group label {
+            display: block;
+            color: #aaa;
+            font-size: 0.85em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 4px;
+            background: #333;
+            border-radius: 2px;
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 14px;
+            height: 14px;
+            background: #fff;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 14px;
+            height: 14px;
+            background: #fff;
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+        }
+
+        .value-display {
+            display: inline-block;
+            background: #1a1a1a;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            margin-left: 10px;
+        }
+
+        select {
+            width: 100%;
+            padding: 10px;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            color: #fff;
+            border-radius: 4px;
+            font-size: 0.9em;
+            cursor: pointer;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin: 30px 0;
+        }
+
+        button {
+            flex: 1;
+            min-width: 140px;
+            padding: 12px 20px;
+            background: transparent;
+            border: 2px solid #555;
+            color: #fff;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 0.95em;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        button:hover:not(:disabled) {
+            border-color: #fff;
+            background: rgba(255,255,255,0.05);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        button.primary {
+            border-color: #fff;
+            background: rgba(255,255,255,0.1);
+        }
+
+        button.primary:hover:not(:disabled) {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .progress-area {
+            display: none;
+            margin: 30px 0;
+            padding: 20px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid #333;
+            border-radius: 4px;
+        }
+
+        .progress-area.active {
+            display: block;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #333;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: #fff;
+            width: 0%;
+            transition: width 0.2s ease;
+        }
+
+        .progress-text {
+            font-size: 0.85em;
+            color: #aaa;
+            text-align: center;
+        }
+
+        .message {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            display: none;
+        }
+
+        .message.show {
+            display: block;
+        }
+
+        .message.success {
+            background: rgba(120,200,140,0.2);
+            border: 1px solid rgba(120,200,140,0.4);
+            color: #7cc88c;
+        }
+
+        .message.error {
+            background: rgba(255,100,100,0.2);
+            border: 1px solid rgba(255,100,100,0.4);
+            color: #ff6464;
+        }
+
+        .preview-area {
+            margin: 20px 0;
+            max-width: 200px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .preview-img {
+            max-width: 100%;
+            max-height: 150px;
+            border-radius: 4px;
+            border: 1px solid #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>水墨光紋</h1>
+        <p class="subtitle">將圖片轉換為水墨效果影片</p>
+
+        <!-- 上傳區域 -->
+        <div class="upload-area" id="uploadArea">
+            <div style="font-size: 2em; margin-bottom: 10px;">🖼️</div>
+            <div style="color: #fff; margin-bottom: 5px;">點擊或拖拉上傳圖片</div>
+            <div style="color: #888; font-size: 0.9em;">支援 JPEG、PNG 等格式（可上傳多張）</div>
+        </div>
+
+        <input type="file" id="fileInput" accept="image/*" multiple>
+
+        <!-- 檔案資訊 -->
+        <div class="file-info" id="fileInfo"></div>
+
+        <!-- 預覽 -->
+        <div class="preview-area" id="previewArea"></div>
+
+        <!-- 參數控制 -->
+        <div class="controls">
+            <div class="control-group">
+                <label>
+                    敏感度 Sensitivity
+                    <span class="value-display" id="sensitivityValue">14</span>
+                </label>
+                <input type="range" id="sensitivity" min="2" max="40" value="14">
+            </div>
+
+            <div class="control-group">
+                <label>
+                    墨韻延遲 Ink Flow
+                    <span class="value-display" id="delayValue">9</span>
+                </label>
+                <input type="range" id="delay" min="2" max="30" value="9">
+            </div>
+
+            <div class="control-group">
+                <label>
+                    筆觸長度 Stroke Length
+                    <span class="value-display" id="strokeLengthValue">26</span>
+                </label>
+                <input type="range" id="strokeLength" min="4" max="60" value="26">
+            </div>
+
+            <div class="control-group">
+                <label>
+                    粒子密度 Particle Density
+                    <span class="value-display" id="densityValue">5</span>
+                </label>
+                <input type="range" id="density" min="1" max="10" value="5">
+            </div>
+
+            <div class="control-group">
+                <label>
+                    影片長度 Video Duration (秒)
+                    <span class="value-display" id="durationValue">5</span>
+                </label>
+                <input type="range" id="duration" min="1" max="30" value="5">
+            </div>
+
+            <div class="control-group">
+                <label>主題 Theme</label>
+                <select id="theme">
+                    <option value="dark">墨夜光紋</option>
+                    <option value="paper">宣紙水墨</option>
+                    <option value="aurora">極光水墨</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- 按鈕 -->
+        <div class="button-group">
+            <button id="processBtn" class="primary" disabled>⚙️ 開始轉換</button>
+            <button id="cancelBtn" style="display:none;">✕ 取消</button>
+            <button id="downloadBtn" style="display:none;">💾 下載影片</button>
+        </div>
+
+        <!-- 進度條 -->
+        <div class="progress-area" id="progressArea">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div class="progress-text" id="progressText">0%</div>
+        </div>
+
+        <!-- 訊息 -->
+        <div class="message" id="message"></div>
+    </div>
+
+    <canvas id="renderCanvas" style="display:none;"></canvas>
+
+    <script>
+        // 全局狀態
+        let images = [];
+        let processedBlob = null;
+        let processingCancelled = false;
+
+        // 參數
+        let params = {
+            sensitivity: 14,
+            delay: 9,
+            strokeLength: 26,
+            density: 5,
+            theme: 'dark',
+            duration: 5
+        };
+
+        // Stroke 類
+        class Stroke {
+            constructor(x, y, angle, length, color, opacity = 1.0) {
+                this.x = x;
+                this.y = y;
+                this.angle = angle;
+                this.length = length;
+                this.color = color;
+                this.opacity = opacity;
+                this.decayRate = 0.95;
+            }
+
+            update() {
+                this.opacity *= this.decayRate;
+            }
+
+            draw(ctx) {
+                if (this.opacity < 0.01) return;
+                const x1 = this.x;
+                const y1 = this.y;
+                const x2 = this.x + Math.cos(this.angle) * this.length;
+                const y2 = this.y + Math.sin(this.angle) * this.length;
+
+                ctx.strokeStyle = this.color.replace(')', `, ${this.opacity})`).replace('rgb', 'rgba');
+                ctx.lineWidth = 1.5;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+            }
+
+            isAlive() {
+                return this.opacity > 0.01;
+            }
+        }
+
+        // 取得顏色
+        function getColors(theme) {
+            const colors = {
+                dark: 'rgb(200, 220, 255)',
+                paper: 'rgb(60, 40, 20)',
+                aurora: 'rgb(100, 200, 255)'
+            };
+            return colors[theme] || colors.dark;
+        }
+
+        // Sobel 分析
+        function analyzeFrame(frame, width, height) {
+            const data = frame.data;
+            const strokes = [];
+
+            for (let y = 1; y < height - 1; y++) {
+                for (let x = 1; x < width - 1; x++) {
+                    const gx = -data[(y-1)*width*4+(x-1)*4] - 2*data[y*width*4+(x-1)*4] - data[(y+1)*width*4+(x-1)*4]
+                              + data[(y-1)*width*4+(x+1)*4] + 2*data[y*width*4+(x+1)*4] + data[(y+1)*width*4+(x+1)*4];
+
+                    const gy = data[(y-1)*width*4+(x-1)*4] + 2*data[(y-1)*width*4+x*4] + data[(y-1)*width*4+(x+1)*4]
+                              - data[(y+1)*width*4+(x-1)*4] - 2*data[(y+1)*width*4+x*4] - data[(y+1)*width*4+(x+1)*4];
+
+                    const magnitude = Math.sqrt(gx*gx + gy*gy);
+
+                    if (magnitude > params.sensitivity * 30) {
+                        const angle = Math.atan2(gy, gx) + Math.PI / 2;
+                        const count = Math.min(params.density, Math.floor(magnitude / (params.sensitivity * 50)));
+                        const color = getColors(params.theme);
+
+                        for (let i = 0; i < count; i++) {
+                            strokes.push(new Stroke(
+                                x + (Math.random() - 0.5) * 2,
+                                y + (Math.random() - 0.5) * 2,
+                                angle + (Math.random() - 0.5) * 0.3,
+                                params.strokeLength,
+                                color,
+                                0.8
+                            ));
+                        }
+                    }
+                }
+            }
+
+            return strokes;
+        }
+
+        // 顯示訊息
+        function showMessage(text, type = 'success') {
+            const el = document.getElementById('message');
+            el.textContent = text;
+            el.className = `message show ${type}`;
+            if (type === 'success') {
+                setTimeout(() => el.classList.remove('show'), 4000);
+            }
+        }
+
+        // 上傳處理
+        document.getElementById('uploadArea').addEventListener('click', () => {
+            document.getElementById('fileInput').click();
+        });
+
+        document.getElementById('uploadArea').addEventListener('dragover', (e) => {
+            e.preventDefault();
+            document.getElementById('uploadArea').classList.add('drag-over');
+        });
+
+        document.getElementById('uploadArea').addEventListener('dragleave', () => {
+            document.getElementById('uploadArea').classList.remove('drag-over');
+        });
+
+        document.getElementById('uploadArea').addEventListener('drop', (e) => {
+            e.preventDefault();
+            document.getElementById('uploadArea').classList.remove('drag-over');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFilesSelect(Array.from(files));
+            }
+        });
+
+        document.getElementById('fileInput').addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFilesSelect(Array.from(e.target.files));
+            }
+        });
+
+        function handleFilesSelect(files) {
+            images = [];
+            document.getElementById('fileInfo').innerHTML = '';
+            document.getElementById('previewArea').innerHTML = '';
+
+            Promise.all(files.map(file => {
+                return new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            images.push(img);
+                            const info = document.createElement('div');
+                            info.className = 'file-item';
+                            info.textContent = `✓ ${file.name} (${img.width}×${img.height})`;
+                            document.getElementById('fileInfo').appendChild(info);
+                            resolve();
+                        };
+                        img.src = e.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                });
+            })).then(() => {
+                if (images.length > 0) {
+                    document.getElementById('processBtn').disabled = false;
+                    // 預覽第一張圖片
+                    const preview = document.createElement('img');
+                    preview.src = images[0].src;
+                    preview.className = 'preview-img';
+                    document.getElementById('previewArea').appendChild(preview);
+                }
+            });
+        }
+
+        // 參數更新
+        ['sensitivity', 'delay', 'strokeLength', 'density', 'duration'].forEach(name => {
+            const id = name === 'strokeLength' ? 'strokeLength' : name;
+            const valueName = name === 'strokeLength' ? 'strokeLengthValue' : name === 'density' ? 'densityValue' : name === 'duration' ? 'durationValue' : name + 'Value';
+            document.getElementById(id).addEventListener('input', (e) => {
+                params[name] = parseInt(e.target.value);
+                document.getElementById(valueName).textContent = e.target.value;
+            });
+        });
+
+        document.getElementById('theme').addEventListener('change', (e) => {
+            params.theme = e.target.value;
+        });
+
+        // 處理圖片生成影片
+        async function processImages() {
+            if (images.length === 0) {
+                showMessage('❌ 請先上傳圖片', 'error');
+                return;
+            }
+
+            processingCancelled = false;
+            document.getElementById('progressArea').classList.add('active');
+            document.getElementById('processBtn').style.display = 'none';
+            document.getElementById('cancelBtn').style.display = 'block';
+
+            return new Promise((resolve) => {
+                const canvas = document.getElementById('renderCanvas');
+                const firstImage = images[0];
+                canvas.width = firstImage.width;
+                canvas.height = firstImage.height;
+                const ctx = canvas.getContext('2d');
+
+                const stream = canvas.captureStream(30);
+
+                // 檢測支援的 MIME 類型
+                let mimeType = 'video/webm';
+                const types = [
+                    'video/webm;codecs=vp9',
+                    'video/webm;codecs=vp8',
+                    'video/webm',
+                    'video/mp4'
+                ];
+
+                for (let type of types) {
+                    if (MediaRecorder.isTypeSupported(type)) {
+                        mimeType = type;
+                        break;
+                    }
+                }
+
+                const recorder = new MediaRecorder(stream, {
+                    mimeType,
+                    videoBitsPerSecond: 5000000
+                });
+
+                const chunks = [];
+                recorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) chunks.push(e.data);
+                };
+
+                recorder.onstop = () => {
+                    processedBlob = new Blob(chunks, { type: mimeType });
+                    document.getElementById('progressArea').classList.remove('active');
+                    document.getElementById('cancelBtn').style.display = 'none';
+                    document.getElementById('downloadBtn').style.display = 'block';
+                    showMessage('✓ 轉換完成！');
+                    resolve();
+                };
+
+                recorder.start();
+
+                const fps = 30;
+                const totalFrames = params.duration * fps;
+                let currentFrame = 0;
+                let strokes = [];
+
+                const processFrame = () => {
+                    if (processingCancelled) {
+                        recorder.stop();
+                        return;
+                    }
+
+                    if (currentFrame >= totalFrames) {
+                        recorder.stop();
+                        return;
+                    }
+
+                    // 循環選擇圖片
+                    const imgIndex = Math.floor((currentFrame / totalFrames) * images.length) % images.length;
+                    const currentImage = images[imgIndex];
+
+                    ctx.drawImage(currentImage, 0, 0);
+
+                    // 縮小取樣
+                    const sampleCanvas = document.createElement('canvas');
+                    sampleCanvas.width = 96;
+                    sampleCanvas.height = 54;
+                    const sampleCtx = sampleCanvas.getContext('2d');
+                    sampleCtx.drawImage(currentImage, 0, 0, 96, 54);
+                    const frame = sampleCtx.getImageData(0, 0, 96, 54);
+
+                    // 背景褪色
+                    if (params.theme === 'paper') {
+                        ctx.fillStyle = 'rgba(240, 235, 220, 0.05)';
+                    } else if (params.theme === 'aurora') {
+                        ctx.fillStyle = 'rgba(20, 20, 40, 0.05)';
+                    } else {
+                        ctx.fillStyle = 'rgba(10, 10, 20, 0.05)';
+                    }
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                    const newStrokes = analyzeFrame(frame, 96, 54);
+                    strokes = strokes.concat(newStrokes).filter(s => s.isAlive());
+                    strokes.forEach(s => s.update());
+
+                    const scaleX = canvas.width / 96;
+                    const scaleY = canvas.height / 54;
+
+                    ctx.save();
+                    if (params.theme === 'paper') {
+                        ctx.globalCompositeOperation = 'multiply';
+                    } else {
+                        ctx.globalCompositeOperation = 'lighter';
+                    }
+                    ctx.scale(scaleX, scaleY);
+                    strokes.forEach(s => s.draw(ctx));
+                    ctx.restore();
+
+                    currentFrame++;
+                    const progress = Math.round((currentFrame / totalFrames) * 100);
+                    document.getElementById('progressFill').style.width = progress + '%';
+                    document.getElementById('progressText').textContent = progress + '%';
+
+                    setTimeout(processFrame, 5);
+                };
+
+                processFrame();
+            });
+        }
+
+        document.getElementById('processBtn').addEventListener('click', async () => {
+            await processImages();
+        });
+
+        document.getElementById('cancelBtn').addEventListener('click', () => {
+            processingCancelled = true;
+            document.getElementById('progressArea').classList.remove('active');
+            document.getElementById('cancelBtn').style.display = 'none';
+            document.getElementById('processBtn').style.display = 'block';
+            showMessage('✕ 已取消', 'error');
+        });
+
+        document.getElementById('downloadBtn').addEventListener('click', () => {
+            if (processedBlob) {
+                const url = URL.createObjectURL(processedBlob);
+                const a = document.createElement('a');
+                a.href = url;
+                // 根據 blob 類型決定副檔名
+                const ext = processedBlob.type.includes('webm') ? 'webm' : 'mp4';
+                a.download = `ink-light-${Date.now()}.${ext}`;
+                a.click();
+                URL.revokeObjectURL(url);
+                showMessage('✓ 下載開始');
+            }
+        });
+    </script>
+</body>
+</html>
