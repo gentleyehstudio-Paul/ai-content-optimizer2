@@ -78,6 +78,14 @@ export function Footer() {
                   指南
                 </Link>
               </li>
+              <li>
+                <Link
+                  href="/contact"
+                  className="text-[14px] text-ink hover:text-red"
+                >
+                  聯絡我們
+                </Link>
+              </li>
             </ul>
           </div>
 

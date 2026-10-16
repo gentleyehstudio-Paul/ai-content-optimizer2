@@ -67,7 +67,7 @@ export function ArticleLayout({
             </p>
           </div>
           <a
-            href="/agents#diagnose"
+            href="/contact"
             className="px-6 py-3 bg-ink text-white font-semibold text-[14px] rounded-full hover:bg-red transition-colors shrink-0"
           >
             免費診斷

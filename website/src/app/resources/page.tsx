@@ -122,7 +122,7 @@ export default function ResourcesPage() {
             從免費診斷開始——上傳你的 AI 圖，設計師親自看圖回覆
           </p>
           <a
-            href="/agents#diagnose"
+            href="/contact"
             className="inline-flex items-center gap-2 mt-8 px-8 py-3.5 bg-white text-ink font-semibold text-[15px] rounded-full hover:bg-red hover:text-white transition-colors"
           >
             免費診斷
