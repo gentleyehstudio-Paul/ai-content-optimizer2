@@ -1040,9 +1040,7 @@ export default function HomePage() {
               預約 30 分鐘免費診斷：看一次你的素材，告訴你哪裡能用、哪裡要修、怎麼落地
             </p>
             <a
-              href="https://lin.ee/gentleyehstudio"
-              target="_blank"
-              rel="noopener noreferrer"
+              href="/contact"
               style={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -1098,20 +1096,15 @@ export default function HomePage() {
               >
                 掃描加好友，直接傳圖問
               </p>
-              <a
-                href="https://lin.ee/gentleyehstudio"
-                target="_blank"
-                rel="noopener noreferrer"
+              <p
                 style={{
-                  display: "inline-block",
-                  marginTop: 10,
-                  fontSize: 14,
-                  borderBottom: "1px solid #f2f2ed",
-                  paddingBottom: 2,
+                  margin: "8px 0 0",
+                  fontSize: 13,
+                  color: "#a9b1a7",
                 }}
               >
-                加入好友 →
-              </a>
+                掃描 QR Code 加好友
+              </p>
             </div>
           </div>
         </div>

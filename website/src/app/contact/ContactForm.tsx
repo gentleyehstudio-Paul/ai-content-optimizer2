@@ -177,16 +177,17 @@ export function ContactForm() {
             OTHER WAYS TO REACH US
           </p>
           <p className="text-text-secondary text-[14px] leading-relaxed">
-            也可以直接透過 LINE 官方帳號聯繫我們，回覆更即時
+            也可以透過 LINE 官方帳號聯繫我們，掃描 QR Code 加好友
           </p>
-          <a
-            href="https://lin.ee/gentleyehstudio"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 mt-6 px-8 py-3.5 bg-ink text-white font-semibold text-[15px] rounded-full hover:bg-red transition-colors"
-          >
-            LINE 官方帳號
-          </a>
+          <div className="mt-6 inline-block">
+            <img
+              src="/assets/line-qrcode.png"
+              alt="LINE QR Code"
+              width={140}
+              height={140}
+              className="rounded-lg"
+            />
+          </div>
         </div>
       </section>
     </>
