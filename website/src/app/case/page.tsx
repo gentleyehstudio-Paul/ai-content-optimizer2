@@ -154,7 +154,7 @@ export default function CaseListPage() {
             從免費診斷開始——到店訪談與流程盤點，找出最值得優化的場景
           </p>
           <a
-            href="/agents#diagnose"
+            href="/contact"
             className="inline-flex items-center gap-2 mt-8 px-8 py-3.5 bg-white text-ink font-semibold text-[15px] rounded-full hover:bg-red hover:text-white transition-colors"
           >
             免費診斷

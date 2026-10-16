@@ -144,7 +144,7 @@ export function CaseLayout({
             </p>
           </div>
           <a
-            href={cta?.href ?? "/agents#diagnose"}
+            href={cta?.href ?? "/contact"}
             className="px-6 py-3 bg-ink text-white font-semibold text-[14px] rounded-full hover:bg-red transition-colors shrink-0"
           >
             {cta?.label ?? "免費診斷"}
