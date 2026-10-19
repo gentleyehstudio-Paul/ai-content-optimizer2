@@ -1,5 +1,5 @@
 const SITE_NAME = '有鬆島 Yousong Island';
-const SITE_URL = process.env.SITE_URL || 'https://yousong-island.onrender.com';
+const SITE_URL = process.env.SITE_URL || 'https://yousong-island.com';
 
 const FONTS_LINK = `<link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -56,10 +56,10 @@ function breadcrumbHTML(crumbs) {
   <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>`;
 }
 
-function renderPage({ title, description, path, ogImage, canonicalPath, body, noindex }) {
+function renderPage({ title, description, path, ogImage, canonicalPath, body, noindex, noCanonical }) {
   const fullTitle = title ? `${title} — ${SITE_NAME}` : `${SITE_NAME} — 連結台灣療癒生態`;
   const desc = description || '有鬆島串連台灣場地、師資、草本與食材，打造島嶼療癒生態網絡。';
-  const canonical = canonicalPath ? `${SITE_URL}${canonicalPath}` : `${SITE_URL}${path || '/'}`;
+  const canonical = noCanonical ? '' : (canonicalPath ? `${SITE_URL}${canonicalPath}` : `${SITE_URL}${path || '/'}`);
   const og = ogImage || `${SITE_URL}/assets/images/hero-island.jpg`;
 
   return `<!DOCTYPE html>
@@ -69,12 +69,12 @@ function renderPage({ title, description, path, ogImage, canonicalPath, body, no
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${esc(fullTitle)}</title>
   <meta name="description" content="${esc(desc)}">
-  <link rel="canonical" href="${esc(canonical)}">
+  ${canonical ? `<link rel="canonical" href="${esc(canonical)}">` : ''}
   ${noindex ? '<meta name="robots" content="noindex, follow">' : ''}
   <meta property="og:title" content="${esc(fullTitle)}">
   <meta property="og:description" content="${esc(desc)}">
   <meta property="og:image" content="${esc(og)}">
-  <meta property="og:url" content="${esc(canonical)}">
+  <meta property="og:url" content="${esc(canonical || SITE_URL)}">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="${esc(SITE_NAME)}">
   <meta property="og:locale" content="zh_TW">

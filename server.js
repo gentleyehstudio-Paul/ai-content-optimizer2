@@ -9,50 +9,20 @@ const { renderPage, headerHTML, footerHTML, SITE_URL, SLUG_MAP, TABLE_TO_SLUG } 
 const { aboutPage, partnersPage, privacyPage } = require('./src/templates/pages');
 const { renderArticlePage, renderJournalListPage } = require('./src/templates/journal');
 const { getArticleBySlug, getAllArticles } = require('./src/data/journal-articles');
+const redirectLegacyHost = require('./src/middleware/redirect-legacy-host');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
+
+app.use(redirectLegacyHost);
+
+app.get('/index.html', (req, res) => res.redirect(301, '/'));
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/api', apiRoutes);
-
-// --- Debug: check if image files exist on deploy ---
-app.get('/api/debug/images', (req, res) => {
-  const fs = require('fs');
-  const imgDir = path.join(__dirname, 'public', 'assets', 'images', 'journal');
-  const publicDir = path.join(__dirname, 'public');
-  const result = {
-    cwd: process.cwd(),
-    __dirname,
-    publicDirExists: fs.existsSync(publicDir),
-    imgDirExists: fs.existsSync(imgDir),
-    files: [],
-  };
-  if (result.imgDirExists) {
-    result.files = fs.readdirSync(imgDir).map(f => {
-      const stat = fs.statSync(path.join(imgDir, f));
-      return { name: f, size: stat.size, isFile: stat.isFile() };
-    });
-  }
-  try {
-    result.allPublicImages = [];
-    const walkDir = path.join(__dirname, 'public', 'assets', 'images');
-    if (fs.existsSync(walkDir)) {
-      const dirs = fs.readdirSync(walkDir, { withFileTypes: true });
-      dirs.forEach(d => {
-        if (d.isDirectory()) {
-          const sub = fs.readdirSync(path.join(walkDir, d.name));
-          sub.forEach(f => result.allPublicImages.push(`${d.name}/${f}`));
-        } else {
-          result.allPublicImages.push(d.name);
-        }
-      });
-    }
-  } catch (e) { result.walkError = e.message; }
-  res.json(result);
-});
 
 // --- robots.txt & sitemap ---
 
@@ -207,7 +177,7 @@ function render404Page(message) {
   </div>
   ${footerHTML()}`;
 
-  return renderPage({ title: '頁面不存在', description: '找不到此頁面', body, path: '/404' });
+  return renderPage({ title: '頁面不存在', description: '找不到此頁面', body, noCanonical: true, noindex: true });
 }
 
 app.use((req, res) => {
