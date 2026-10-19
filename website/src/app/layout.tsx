@@ -47,9 +47,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             __html: JSON.stringify({
               "@context": "https://schema.org",
               "@type": "Organization",
+              "@id": "https://www.gentleyehdesign.com/#organization",
               name: "Gentleyehstudio",
+              alternateName: ["居葉國際文化有限公司", "Gentleyeh Studio", "居葉設計"],
               legalName: "居葉國際文化有限公司",
               url: "https://www.gentleyehdesign.com",
+              logo: "https://www.gentleyehdesign.com/icon.jpg",
               description:
                 "AI 品牌安全視覺代理與企業培訓：Logo 修正、去 AI 味、放大印刷、AI 視覺應用課程",
               founder: {
@@ -57,6 +60,19 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                 name: "葉致綱",
                 alternateName: "Paul Yeh",
                 jobTitle: "品牌設計師 · AI 應用規劃師",
+              },
+              foundingDate: "2016-10-20",
+              address: {
+                "@type": "PostalAddress",
+                addressLocality: "新北市",
+                addressRegion: "TW",
+                addressCountry: "TW",
+              },
+              contactPoint: {
+                "@type": "ContactPoint",
+                contactType: "customer service",
+                url: "https://www.gentleyehdesign.com/contact",
+                availableLanguage: ["zh-TW", "en"],
               },
               knowsAbout: [
                 "AI 圖片生成",
@@ -69,6 +85,23 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               sameAs: [
                 "https://www.linkedin.com/in/paul-yeh-82a185154/",
               ],
+            }),
+          }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "WebSite",
+              "@id": "https://www.gentleyehdesign.com/#website",
+              name: "Gentleyehstudio",
+              alternateName: "居葉國際文化有限公司",
+              url: "https://www.gentleyehdesign.com",
+              publisher: {
+                "@id": "https://www.gentleyehdesign.com/#organization",
+              },
+              inLanguage: "zh-TW",
             }),
           }}
         />
