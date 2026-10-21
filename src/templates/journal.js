@@ -53,7 +53,7 @@ function renderArticlePage(article) {
     },
   };
   if (article.author) jsonLd.author = { '@type': 'Person', name: article.author };
-  if (article.coverImage) jsonLd.image = article.coverImage;
+  if (article.coverImage) jsonLd.image = article.coverImage.startsWith('/') ? `${SITE_URL}${article.coverImage}` : article.coverImage;
 
   const body = `
   ${headerHTML({ solid: true })}

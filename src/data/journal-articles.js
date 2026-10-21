@@ -12,7 +12,7 @@ const articles = [
     guide: '',
     readingTime: '約 4 分鐘',
     featured: true,
-    published: false,
+    published: true,
     coverImage: '/assets/images/journal/morning-run-cover.jpg',
     coverImageAlt: '淡藍色清晨，旅客與晨跑引導員在山林旅宿外暖身',
     relatedTrip: '',

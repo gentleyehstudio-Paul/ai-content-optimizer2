@@ -100,6 +100,24 @@ function renderDetailPage(type, item, relatedItems) {
     </section>`;
   }
 
+  function compact(obj) {
+    if (Array.isArray(obj)) {
+      const arr = obj.map(compact).filter((v) => v !== undefined);
+      return arr.length ? arr : undefined;
+    }
+    if (obj && typeof obj === 'object') {
+      const out = {};
+      for (const [k, v] of Object.entries(obj)) {
+        const c = compact(v);
+        if (c !== undefined) out[k] = c;
+      }
+      return Object.keys(out).length ? out : undefined;
+    }
+    if (obj === undefined || obj === null) return undefined;
+    if (typeof obj === 'string' && obj.trim() === '') return undefined;
+    return obj;
+  }
+
   const jsonLd = { '@context': 'https://schema.org' };
   const fullUrl = `${SITE_URL}/${slug}/${item.id}`;
 
@@ -177,7 +195,7 @@ function renderDetailPage(type, item, relatedItems) {
   </div>
 
   ${footerHTML()}
-  <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
+  <script type="application/ld+json">${JSON.stringify(compact(jsonLd))}</script>
   <script>window.__YS_TYPE="${type}";window.__YS_SLUG="${slug}";</script>
   <script src="/js/detail.js"></script>`;
 
