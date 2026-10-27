@@ -44,6 +44,7 @@
 <div id="bar">
   <button id="bCam">開啟鏡頭</button>
   <button id="bFlip">翻轉鏡頭</button>
+  <button id="bAud">環境音</button>
   <button id="bRec">錄影</button>
   <button id="bFull">全螢幕</button>
 </div>
@@ -72,6 +73,8 @@ const DEF = {
   bright: 1.0,    // 亮度
   wA: 1.0,        // A 路（海面）權重
   wB: 0.7,        // B 路（觀眾）權重
+  audio: false,   // 環境音驅動波浪（麥克風）
+  audioGain: 1.0, // 環境音靈敏度
   bleed: 0.30,    // 墨水暈染（擴散）強度
   trail: 0.055,   // 每幀黑色覆蓋透明度（越小殘影越長）
   gate: 0.02,     // 影格差分雜訊門檻
@@ -343,6 +346,7 @@ function analysisTick(now, okA, okB) {
     const a = noise3(x * 0.07, y * 0.12, ambT) * 0.0035, i = y * GW + x;
     h[i] += a; h[i + 1] += a; h[i + GW] += a; h[i + GW + 1] += a;
   }
+  audioTick();
 }
 
 /* ---------------- 2D 波動方程式 ---------------- */
@@ -590,7 +594,7 @@ function frame(ts) {
   accA += dt;
   if (accA >= 1 / 30) { accA %= 1 / 30; analysisTick(now, okA, okB); }
   accW += dt; let steps = 0;
-  while (accW >= 1 / 60 && steps < 3) { waveStep(); accW -= 1 / 60; steps++; }
+  while (accW >= 1 / 60 && steps < 3) { audioDrive(); waveStep(); accW -= 1 / 60; steps++; }
   if (accW > 0.1) accW = 0;
   const dk = Math.pow(0.975, dt * 60);              // 夜光約 3 秒回到暗
   for (let i = 0; i < N; i++) Eg[i] *= dk;
@@ -692,7 +696,7 @@ const panel = document.getElementById('panel');
 const SL = [
   ['speed', '波速', 0.05, 0.45, 0.01], ['damp', '阻尼（保留率）', 0.95, 0.999, 0.001], ['bright', '亮度', 0.3, 2, 0.05],
   ['wA', 'A 路 海面權重', 0, 2, 0.05], ['wB', 'B 路 觀眾權重', 0, 2, 0.05],
-  ['bleed', '墨水暈染', 0, 0.8, 0.02], ['trail', '殘影消退（越小越長）', 0.015, 0.25, 0.005], ['inject', '動態注入強度', 0.2, 3, 0.05], ['gate', '雜訊門檻', 0, 0.08, 0.002]
+  ['bleed', '墨水暈染', 0, 0.8, 0.02], ['audioGain', '環境音靈敏度', 0.2, 3, 0.05], ['trail', '殘影消退（越小越長）', 0.015, 0.25, 0.005], ['inject', '動態注入強度', 0.2, 3, 0.05], ['gate', '雜訊門檻', 0, 0.08, 0.002]
 ];
 function buildPanel() {
   let html = '<h4>電氣藍墨 · 參數（H 關閉　R 錄影　F 全螢幕）</h4>';
@@ -702,6 +706,7 @@ function buildPanel() {
   html += '<label>A 路 海面來源<select id="selA"></select></label>';
   html += '<label>B 路 觀眾來源<select id="selB"></select></label>';
   html += '<label>載入 MP4 海浪影片（循環播放）<input type="file" id="file" accept="video/*,.mp4"></label>';
+  html += '<label><input type="checkbox" id="aud"> 環境音驅動波浪（需麥克風；不錄音、不上傳）</label>';
   html += '<label><input type="checkbox" id="mirB"> B 路左右鏡像</label>';
   html += '<label><input type="checkbox" id="hourly"> 每小時自動存一張生成畫面 PNG</label>';
   html += '<button id="rescan">重新掃描攝影機</button> <button id="reset">還原預設</button>';
@@ -714,6 +719,8 @@ function buildPanel() {
   }
   document.getElementById('selA').addEventListener('change', e => { P.srcA = e.target.value; savePrefs(); applyChoice(SA, P.srcA, 'A'); });
   document.getElementById('selB').addEventListener('change', e => { P.srcB = e.target.value; savePrefs(); applyChoice(SB, P.srcB, 'B'); });
+  document.getElementById('aud').checked = P.audio;
+  document.getElementById('aud').addEventListener('change', e => setAudio(e.target.checked));
   document.getElementById('mirB').checked = P.mirrorB;
   document.getElementById('mirB').addEventListener('change', e => { P.mirrorB = e.target.checked; savePrefs(); });
   document.getElementById('hourly').checked = P.hourly;
@@ -770,6 +777,7 @@ async function startInputs() {
   await scanDevices(true);
   if (SA.kind !== 'file') applyChoice(SA, P.srcA, 'A');
   applyChoice(SB, P.srcB, 'B');
+  if (P.audio) audioStart();
   if (typeof updateBar === 'function') updateBar();
 }
 if (navigator.mediaDevices && navigator.mediaDevices.addEventListener)
@@ -788,6 +796,7 @@ function showBar() {
 }
 function camIsOn() { return SB.kind === 'cam'; }
 function updateBar() {
+  $('bAud').classList.toggle('on', !!(P.audio && AU.on));
   $('bCam').textContent = camIsOn() ? '關閉鏡頭' : '開啟鏡頭'; $('bCam').classList.toggle('on', camIsOn());
   const r = rec && rec.state === 'recording';
   $('bRec').classList.toggle('rec', !!r);
@@ -805,6 +814,7 @@ $('bFlip').addEventListener('click', () => {
   camFacing = camFacing === 'user' ? 'environment' : 'user';
   if (camIsOn()) camOn(); showBar();
 });
+$('bAud').addEventListener('click', () => { setAudio(!P.audio); showBar(); });
 $('bRec').addEventListener('click', () => { toggleRec(true); showBar(); updateBar(); });
 $('bFull').addEventListener('click', () => { if (document.fullscreenElement) document.exitFullscreen(); else goFull(); showBar(); });
 ['pointerdown', 'pointermove', 'touchstart'].forEach(ev => addEventListener(ev, showBar, { passive: true }));
@@ -835,6 +845,84 @@ $('dlgShare').addEventListener('click', async () => {      // 需由使用者點
 });
 updateBar();
 
+/* ---------------- 環境音 → 海浪 ----------------
+   麥克風 → AnalyserNode（不接喇叭、不錄音、不上傳，只取頻譜）
+   · 頻譜重心（音高）決定海浪的「波長 / 頻率」：低沉 → 長而慢的湧浪，尖銳 → 短而急的細浪
+   · 音量決定波高；左緣與下緣兩條線波源互相干涉
+   · 各頻段的瞬間增量（onset）在對應 x 位置激出圓環波，並讓該處夜光閃亮（低頻在左、高頻在右）*/
+const NBAND = 32;
+const AU = { ctx: null, an: null, src: null, stream: null, on: false, opening: false, lastTry: 0, buf: null, edges: [],
+  fl: new Float32Array(NBAND), pk: new Float32Array(NBAND).fill(0.2), lv: new Float32Array(NBAND), pv: new Float32Array(NBAND),
+  cen: 0.3, amp: 0, phase: 0 };
+async function audioStart() {
+  if (AU.opening || AU.on || !navigator.mediaDevices) return;
+  AU.opening = true; AU.lastTry = performance.now();
+  try {
+    const st = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }, video: false });
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AU.ctx) AU.ctx = new AC();
+    if (AU.ctx.state === 'suspended') await AU.ctx.resume();
+    const an = AU.ctx.createAnalyser(); an.fftSize = 1024; an.smoothingTimeConstant = 0.5;
+    const src = AU.ctx.createMediaStreamSource(st); src.connect(an);
+    AU.stream = st; AU.an = an; AU.src = src; AU.buf = new Uint8Array(an.frequencyBinCount);
+    const nb = an.frequencyBinCount, nyq = AU.ctx.sampleRate / 2; AU.edges = [];
+    for (let b = 0; b <= NBAND; b++) AU.edges.push(Math.max(b ? AU.edges[b - 1] + 1 : 1, Math.round(60 * Math.pow(8000 / 60, b / NBAND) / nyq * nb)));
+    st.getAudioTracks().forEach(t => { t.onended = () => { AU.on = false; updateBar(); }; });
+    AU.on = true;
+  } catch (e) { AU.on = false; }
+  AU.opening = false; updateBar();
+}
+function audioStop() {
+  AU.on = false;
+  try { if (AU.src) AU.src.disconnect(); } catch (e) {}
+  if (AU.stream) AU.stream.getTracks().forEach(t => { try { t.stop(); } catch (e) {} });
+  AU.stream = null; AU.src = null; updateBar();
+}
+function setAudio(on) {
+  P.audio = !!on; savePrefs();
+  const c = document.getElementById('aud'); if (c) c.checked = P.audio;
+  if (P.audio) audioStart(); else audioStop();
+}
+setInterval(() => { if (P.audio && !AU.on && !AU.opening && performance.now() - AU.lastTry > 5000) audioStart(); }, 2000);   // 麥克風中斷自動重連
+function addBlob(arr, cx, cy, r, a) {
+  const x0 = Math.max(1, Math.floor(cx - r * 2)), x1 = Math.min(GW - 2, Math.ceil(cx + r * 2));
+  const y0 = Math.max(1, Math.floor(cy - r * 2)), y1 = Math.min(GH - 2, Math.ceil(cy + r * 2));
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+    const d2 = ((x - cx) * (x - cx) + (y - cy) * (y - cy)) / (r * r);
+    if (d2 < 4) arr[y * GW + x] += a * Math.exp(-d2);
+  }
+}
+function audioTick() {
+  if (!AU.on) { AU.amp *= 0.9; return; }
+  AU.an.getByteFrequencyData(AU.buf);
+  const g = P.audioGain; let sum = 0, cw = 0, nimp = 0;
+  for (let b = 0; b < NBAND; b++) {
+    let v = 0; const e0 = AU.edges[b], e1 = Math.max(e0 + 1, AU.edges[b + 1]);
+    for (let k = e0; k < e1; k++) v += AU.buf[k]; v /= (e1 - e0) * 255;
+    AU.pk[b] = Math.max(v, AU.pk[b] * 0.997); AU.fl[b] += (v - AU.fl[b]) * 0.01;    // 自適應：只反應相對於環境底噪的變化
+    const lv = clamp((v - AU.fl[b]) / (AU.pk[b] - AU.fl[b] + 0.08), 0, 1) * g;
+    AU.pv[b] = AU.lv[b]; AU.lv[b] = lv; sum += lv; cw += lv * b;
+    const flux = lv - AU.pv[b];
+    if (flux > 0.22 && nimp < 8) {                                    // 頻段 onset → 圓環波 + 夜光閃
+      nimp++;
+      const x = 12 + (b / (NBAND - 1)) * (GW - 24), y = 14 + Math.random() * (GH - 28), r = b < 8 ? 4 : b < 20 ? 2.8 : 1.8;
+      addBlob(h, x, y, r, Math.min(0.25, flux * 0.22) * (b < 8 ? 1.4 : 1));
+      addBlob(Eg, x, y, r + 1, Math.min(1, flux * 0.9));
+    }
+  }
+  const loud = Math.min(1.2, sum / NBAND * 3);
+  if (sum > 0.4) AU.cen += (cw / sum / (NBAND - 1) - AU.cen) * 0.12;
+  AU.amp += (loud - AU.amp) * 0.35;
+}
+function audioDrive() {
+  if (AU.amp < 0.003) return;
+  AU.phase += 2 * Math.PI * (0.8 + 4.2 * AU.cen) / 60;               // 音高 → 波頻（0.8–5 Hz）
+  const A = AU.amp * 0.018, tilt = 0.06 + AU.cen * 0.14;
+  for (let y = 4; y < GH - 4; y++) h[y * GW + 10] += A * Math.sin(AU.phase - y * tilt);
+  const row = (GH - 11) * GW;
+  for (let x = 4; x < GW - 4; x++) h[row + x] += A * 0.8 * Math.sin(AU.phase * 1.07 + x * tilt * 0.8 + 1.3);
+}
+
 /* ---------------- 啟動 ---------------- */
 buildPanel();
 resetFields();
@@ -843,7 +931,7 @@ setTimeout(() => { startInputs(); }, 2000);            // 延遲 2 秒自動啟�
 
 // 供除錯 / 驗收（不顯示於畫面）
 window.__ebi = { P, SA, SB, get fps() { return fps; }, get frames() { return nFrames; }, get agc() { return agcM; }, h: () => h, Eg: () => Eg, E: () => E,
-  get devices() { return devices; }, reinit, applyChoice, useFile(u, role) { fileURL = u; fileName = 't'; applyChoice(role === 'B' ? SB : SA, 'file', role); }, get PB() { return PB; } };
+  get devices() { return devices; }, reinit, AU, setAudio, applyChoice, useFile(u, role) { fileURL = u; fileName = 't'; applyChoice(role === 'B' ? SB : SA, 'file', role); }, get PB() { return PB; } };
 })();
 </script>
 </body>
