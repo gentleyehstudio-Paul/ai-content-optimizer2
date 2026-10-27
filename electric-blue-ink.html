@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>電氣藍墨</title>
+<style>
+  html,body{margin:0;height:100%;background:#000;overflow:hidden;cursor:none}
+  body.ui{cursor:default}
+  #out{position:fixed;left:0;top:0;width:100%;height:100%;object-fit:contain;background:#000;display:block}
+  /* 影像來源不可 display:none，否則部分瀏覽器會停止解碼、擷取到靜態畫面 */
+  video.src{position:fixed;left:0;top:0;width:160px;height:90px;opacity:0;pointer-events:none}
+  #panel{display:none;position:fixed;right:12px;top:12px;width:280px;max-height:calc(100% - 24px);overflow:auto;
+    background:rgba(2,4,10,.88);border:1px solid #1B4F8C;color:#9fc8ee;font:12px/1.5 system-ui,"Noto Sans TC",sans-serif;
+    padding:10px 12px;border-radius:4px;z-index:5}
+  body.ui #panel{display:block}
+  #panel h4{margin:0 0 6px;font-size:12px;color:#BFF3FF;font-weight:600}
+  #panel label{display:block;margin:6px 0 0}
+  #panel input[type=range]{width:100%;margin:0}
+  #panel select,#panel input[type=file]{width:100%;margin-top:2px;background:#050a18;color:#9fc8ee;border:1px solid #1B4F8C}
+  #panel .row{display:flex;justify-content:space-between}
+  #panel .sep{border-top:1px solid #0A1A3F;margin:8px 0}
+  #panel button{background:#0A1A3F;color:#BFF3FF;border:1px solid #1B4F8C;padding:3px 8px;margin-top:6px;cursor:pointer}
+</style>
+</head>
+<body>
+<canvas id="out" width="1920" height="1080"></canvas>
+<div id="panel"></div>
+<script>
+(() => {
+'use strict';
+
+/* ================================================================
+   電氣藍墨  Electric Blue Ink
+   影格差分 + Sobel + 梯度光流 → 2D 波動方程式高度場 → 等高線墨線 + 粒子
+   ================================================================ */
+
+const GW = 160, GH = 90, N = GW * GH;          // 分析 / 波動網格
+const OW = 1920, OH = 1080, CELL = OW / GW;    // 輸出解析度，每格 12px
+const LS_KEY = 'electricBlueInk.v1';
+
+/* ---------------- 參數與持久化 ---------------- */
+const DEF = {
+  speed: 0.30,    // 波速 (Courant 數 c²，<0.5 穩定)
+  damp: 0.980,    // 阻尼：每步保留率
+  bright: 1.0,    // 亮度
+  wA: 1.0,        // A 路（海面）權重
+  wB: 0.7,        // B 路（觀眾）權重
+  trail: 0.055,   // 每幀黑色覆蓋透明度（越小殘影越長）
+  gate: 0.02,     // 影格差分雜訊門檻
+  inject: 1.0,    // 動態注入波場強度
+  srcA: 'auto', srcB: 'auto',
+  mirrorB: true,
+  hourly: false
+};
+const P = Object.assign({}, DEF);
+try {
+  const s = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
+  if (s && typeof s === 'object') for (const k in DEF) if (k in s && typeof s[k] === typeof DEF[k]) P[k] = s[k];
+} catch (e) {}
+function savePrefs() { try { localStorage.setItem(LS_KEY, JSON.stringify(P)); } catch (e) {} }
+
+/* ---------------- 工具 ---------------- */
+const clamp = (x, a, b) => x < a ? a : x > b ? b : x;
+function hash(i) {                                  // 0..1
+  let h = Math.imul(i ^ (i >>> 15), 0x2c1b3c6d);
+  h = Math.imul(h ^ (h >>> 12), 0x297a2d39);
+  h ^= h >>> 15;
+  return (h >>> 0) / 4294967296;
+}
+/* Improved Perlin noise 3D（模擬海浪備援用） */
+const perm = new Uint8Array(512);
+(function () {
+  const p = []; for (let i = 0; i < 256; i++) p.push(i);
+  let s = 1337;
+  for (let i = 255; i > 0; i--) { s = (s * 16807) % 2147483647; const j = s % (i + 1); const t = p[i]; p[i] = p[j]; p[j] = t; }
+  for (let i = 0; i < 512; i++) perm[i] = p[i & 255];
+})();
+const fade = t => t * t * t * (t * (t * 6 - 15) + 10);
+const lerp = (a, b, t) => a + (b - a) * t;
+function grad(h, x, y, z) {
+  h &= 15; const u = h < 8 ? x : y, v = h < 4 ? y : (h === 12 || h === 14 ? x : z);
+  return ((h & 1) ? -u : u) + ((h & 2) ? -v : v);
+}
+function noise3(x, y, z) {
+  const X = Math.floor(x) & 255, Y = Math.floor(y) & 255, Z = Math.floor(z) & 255;
+  x -= Math.floor(x); y -= Math.floor(y); z -= Math.floor(z);
+  const u = fade(x), v = fade(y), w = fade(z);
+  const A = perm[X] + Y, AA = perm[A] + Z, AB = perm[A + 1] + Z, B = perm[X + 1] + Y, BA = perm[B] + Z, BB = perm[B + 1] + Z;
+  return lerp(
+    lerp(lerp(grad(perm[AA], x, y, z), grad(perm[BA], x - 1, y, z), u), lerp(grad(perm[AB], x, y - 1, z), grad(perm[BB], x - 1, y - 1, z), u), v),
+    lerp(lerp(grad(perm[AA + 1], x, y, z - 1), grad(perm[BA + 1], x - 1, y, z - 1), u), lerp(grad(perm[AB + 1], x, y - 1, z - 1), grad(perm[BB + 1], x - 1, y - 1, z - 1), u), v),
+    w);
+}
+
+/* ---------------- 色階 ---------------- */
+const STOPS = [[0, 10, 26, 63], [0.38, 27, 79, 140], [0.72, 63, 169, 245], [1, 191, 243, 255]];
+function ramp(t) {
+  t = clamp(t, 0, 1);
+  for (let i = 1; i < STOPS.length; i++) if (t <= STOPS[i][0]) {
+    const a = STOPS[i - 1], b = STOPS[i], k = (t - a[0]) / (b[0] - a[0]);
+    return [a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k, a[3] + (b[3] - a[3]) * k];
+  }
+  return [191, 243, 255];
+}
+const NB = 7;                                        // 能量色階分箱
+const BIN_RGB = [], BIN_ALPHA = [0.45, 0.55, 0.62, 0.7, 0.75, 0.8, 0.85];
+for (let i = 0; i < NB; i++) BIN_RGB.push(ramp((i + 0.5) / NB));
+const binCol = i => 'rgb(' + (BIN_RGB[i][0] | 0) + ',' + (BIN_RGB[i][1] | 0) + ',' + (BIN_RGB[i][2] | 0) + ')';
+const BIN_STR = BIN_RGB.map((_, i) => binCol(i));
+const LUT = new Uint8Array(256 * 3);
+for (let i = 0; i < 256; i++) { const c = ramp(i / 255); LUT[i * 3] = c[0]; LUT[i * 3 + 1] = c[1]; LUT[i * 3 + 2] = c[2]; }
+
+/* ---------------- Canvas ---------------- */
+const out = document.getElementById('out');
+let octx = out.getContext('2d', { alpha: false });
+function mkCanvas(w, h, opts) { const c = document.createElement('canvas'); c.width = w; c.height = h; return [c, c.getContext('2d', opts)]; }
+const [ink, ictx] = mkCanvas(OW, OH, { alpha: false });
+const [bl1, b1ctx] = mkCanvas(480, 270);
+const [bl2, b2ctx] = mkCanvas(120, 68);
+const [gcv, gctx] = mkCanvas(GW, GH);
+const [grabCv, grabCtx] = mkCanvas(GW, GH, { willReadFrequently: true });
+grabCtx.imageSmoothingQuality = 'high';
+const glowImg = gctx.createImageData(GW, GH);
+function clearAll() {
+  ictx.globalCompositeOperation = 'source-over';
+  ictx.fillStyle = '#000'; ictx.fillRect(0, 0, OW, OH);
+  octx.fillStyle = '#000'; octx.fillRect(0, 0, OW, OH);
+}
+clearAll();
+
+/* ---------------- 場資料 ---------------- */
+const f32 = () => new Float32Array(N);
+let h = f32(), hp = f32(), hn = f32();           // 高度場（現在 / 前一步 / 暫存）
+const Eg = f32();                                 // 夜光能量（受擾動發光，慢衰減）
+const E = f32();                                  // 渲染能量 0..1
+const gX = f32(), gY = f32();                     // 高度場梯度
+const flowU = f32(), flowV = f32();               // 光流 (格/tick)
+const sponge = f32();
+for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
+  const d = Math.min(x, y, GW - 1 - x, GH - 1 - y), m = 9;
+  sponge[y * GW + x] = d >= m ? 1 : 0.88 + 0.12 * (d / m);
+}
+function mkPath() {
+  return { raw: f32(), cur: f32(), prev: f32(), d: f32(), edge: f32(), u: f32(), v: f32(), tmp: f32(), d2: f32(), primed: false };
+}
+const PA = mkPath(), PB = mkPath();
+const simGray = f32(), camGray = f32();
+
+function blur3(src, dst) {
+  for (let y = 0; y < GH; y++) {
+    const y0 = y > 0 ? y - 1 : 0, y1 = y < GH - 1 ? y + 1 : y;
+    for (let x = 0; x < GW; x++) {
+      const x0 = x > 0 ? x - 1 : 0, x1 = x < GW - 1 ? x + 1 : x;
+      dst[y * GW + x] = (src[y0 * GW + x0] + src[y0 * GW + x] + src[y0 * GW + x1] +
+        src[y * GW + x0] + src[y * GW + x] * 2 + src[y * GW + x1] +
+        src[y1 * GW + x0] + src[y1 * GW + x] + src[y1 * GW + x1]) / 10;
+    }
+  }
+}
+
+/* ---------------- 輸入來源 ---------------- */
+function mkVideo() {
+  const v = document.createElement('video');
+  v.className = 'src'; v.muted = true; v.autoplay = true; v.playsInline = true; v.setAttribute('playsinline', '');
+  document.body.appendChild(v);
+  return v;
+}
+function mkSrc(name) {
+  return { name, kind: 'sim', video: mkVideo(), stream: null, devId: '', lastCT: -1, lastFrameT: 0,
+           mix: 0, dead: false, opening: false, lastTry: 0 };
+}
+const SA = mkSrc('A'), SB = mkSrc('B'); SB.kind = 'off';
+let devices = [], fileURL = null, fileName = '';
+
+function stopSrc(S) {
+  if (S.stream) { S.stream.getTracks().forEach(t => { try { t.stop(); } catch (e) {} }); S.stream = null; }
+  try { S.video.pause(); } catch (e) {}
+  S.video.srcObject = null;
+  if (S.kind === 'file' || S.video.src) { S.video.removeAttribute('src'); try { S.video.load(); } catch (e) {} }
+  S.dead = false; S.lastCT = -1;
+}
+async function openCam(S) {
+  if (S.opening || S.kind !== 'cam') return;
+  S.opening = true; S.lastTry = performance.now();
+  try {
+    if (S.stream) S.stream.getTracks().forEach(t => { try { t.stop(); } catch (e) {} });
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { deviceId: { exact: S.devId }, width: { ideal: 640 }, height: { ideal: 360 }, frameRate: { ideal: 30 } }, audio: false });
+    S.stream = stream; S.dead = false;
+    stream.getVideoTracks().forEach(t => { t.onended = () => { S.dead = true; }; });
+    S.video.srcObject = stream;
+    try { await S.video.play(); } catch (e) {}
+    S.lastFrameT = performance.now(); S.lastCT = -1;
+  } catch (e) { S.dead = true; }
+  S.opening = false;
+}
+function applyChoice(S, choice, role) {
+  stopSrc(S);
+  if (choice === 'auto') choice = role === 'A' ? (devices[0] ? devices[0].deviceId : 'sim') : (devices[1] ? devices[1].deviceId : 'off');
+  if (choice === 'sim' || choice === 'off') { S.kind = role === 'A' ? 'sim' : 'off'; return; }
+  if (choice === 'file') {
+    if (!fileURL) { S.kind = role === 'A' ? 'sim' : 'off'; return; }
+    S.kind = 'file'; S.video.loop = true; S.video.src = fileURL; S.lastFrameT = performance.now();
+    S.video.play().catch(() => {});
+    return;
+  }
+  S.kind = 'cam'; S.devId = choice; S.lastFrameT = performance.now(); openCam(S);
+}
+function alive(S, now) {
+  if (S.kind !== 'cam' && S.kind !== 'file') return false;
+  const v = S.video;
+  if (v.readyState < 2 || !v.videoWidth) return false;
+  if (v.currentTime !== S.lastCT) { S.lastCT = v.currentTime; S.lastFrameT = now; }
+  if (S.kind === 'cam' && S.dead) return false;
+  if (S.kind === 'file' && v.paused) v.play().catch(() => {});
+  return now - S.lastFrameT < 3000;               // 超過 3 秒無新畫面視為中斷
+}
+function grabGray(S, mirror, outArr) {
+  const v = S.video, vw = v.videoWidth, vh = v.videoHeight;
+  let sw = vw, sh = vw * 9 / 16;
+  if (sh > vh) { sh = vh; sw = vh * 16 / 9; }
+  const sx = (vw - sw) / 2, sy = (vh - sh) / 2;
+  grabCtx.save();
+  if (mirror) { grabCtx.translate(GW, 0); grabCtx.scale(-1, 1); }
+  grabCtx.drawImage(v, sx, sy, sw, sh, 0, 0, GW, GH);
+  grabCtx.restore();
+  const d = grabCtx.getImageData(0, 0, GW, GH).data;
+  for (let i = 0, j = 0; i < N; i++, j += 4) outArr[i] = (d[j] * 0.299 + d[j + 1] * 0.587 + d[j + 2] * 0.114) / 255;
+}
+function stepSource(S, now, dt) {
+  const ok = alive(S, now);
+  if (!ok && S.kind === 'cam' && !S.opening && now - S.lastTry > 5000) openCam(S);   // 自動重連
+  const target = ok ? 1 : 0, rate = dt / (S === SA ? 1.5 : 0.4);
+  S.mix += clamp(target - S.mix, -rate, rate);
+  return ok;
+}
+
+/* ---------------- 模擬海浪（Perlin 驅動的備援影像） ---------------- */
+function simSea(o, t) {
+  for (let y = 0; y < GH; y++) {
+    const v = y / GH, vp = v * v * 0.85 + v * 0.15;
+    for (let x = 0; x < GW; x++) {
+      const u = x / GW;
+      const w = noise3(u * 2.2 + t * 0.05, v * 3.0, t * 0.12) * 0.12;
+      const n1 = noise3((u + w) * 3.2 - t * 0.3, vp * 7, t * 0.3);
+      const n2 = noise3((u + w) * 7.5 - t * 0.55, vp * 17, t * 0.6) * 0.5;
+      let g = 0.5 + 0.5 * (n1 * 0.75 + n2 * 0.45);
+      g = clamp(g, 0, 1); o[y * GW + x] = g * g * (3 - 2 * g);
+    }
+  }
+}
+
+/* ---------------- 分析：差分 + Sobel + 光流 ---------------- */
+function analysePath(Q, gate) {
+  blur3(Q.raw, Q.cur);
+  const c = Q.cur, pv = Q.prev, g = gate;
+  if (!Q.primed) { pv.set(c); Q.primed = true; Q.d.fill(0); Q.u.fill(0); Q.v.fill(0); Q.edge.fill(0); return; }
+  for (let i = 0; i < N; i++) {
+    let d = c[i] - pv[i];
+    d = d > g ? d - g : d < -g ? d + g : 0;
+    Q.d[i] = d;
+  }
+  for (let y = 1; y < GH - 1; y++) for (let x = 1; x < GW - 1; x++) {
+    const i = y * GW + x;
+    const ix = ((c[i - GW + 1] + 2 * c[i + 1] + c[i + GW + 1]) - (c[i - GW - 1] + 2 * c[i - 1] + c[i + GW - 1])) * 0.25;
+    const iy = ((c[i + GW - 1] + 2 * c[i + GW] + c[i + GW + 1]) - (c[i - GW - 1] + 2 * c[i - GW] + c[i - GW + 1])) * 0.25;
+    Q.edge[i] = Math.min(1, Math.hypot(ix, iy) * 5);
+    const den = ix * ix + iy * iy + 0.004, d = Q.d[i];
+    Q.u[i] = Q.u[i] * 0.7 + clamp(-d * ix / den, -1.5, 1.5) * 0.3;     // 梯度光流（法向流）
+    Q.v[i] = Q.v[i] * 0.7 + clamp(-d * iy / den, -1.5, 1.5) * 0.3;
+  }
+  pv.set(c);
+}
+
+let ambT = 0, agcM = 0.012;
+function analysisTick(now, okA, okB) {
+  const t = now / 1000;
+  /* A 路：攝影機 / 影片檔 與模擬海浪依 mix 交叉淡化，切換時不產生突波 */
+  if (SA.mix > 0.001 && (okA || SA.mix > 0.01)) { if (okA) grabGray(SA, false, camGray); }
+  if (SA.mix < 0.999) simSea(simGray, t);
+  const m = SA.mix;
+  if (m <= 0.001) PA.raw.set(simGray);
+  else if (m >= 0.999) PA.raw.set(camGray);
+  else for (let i = 0; i < N; i++) PA.raw[i] = simGray[i] + (camGray[i] - simGray[i]) * m;
+  analysePath(PA, P.gate * SA.mix);   // 模擬海浪無雜訊，不需門檻
+  /* B 路 */
+  if (okB) {
+    grabGray(SB, P.mirrorB, PB.raw); analysePath(PB, P.gate);
+  } else if (PB.primed) { PB.primed = false; PB.d.fill(0); PB.u.fill(0); PB.v.fill(0); PB.edge.fill(0); }
+
+  /* A 路自動增益：以慢速平均的差分量正規化，不同曝光 / 場景都落在相近的動態範圍 */
+  let sa = 0; for (let i = 0; i < N; i++) sa += Math.abs(PA.d[i]);
+  agcM += (sa / N - agcM) * 0.004;
+  const agc = clamp(0.008 / (agcM + 0.002), 0.4, 10);
+  blur3(PA.d, PA.tmp); blur3(PA.tmp, PA.d2);                // 注入前平滑，避免單格點狀擾動
+  const wA = P.wA * agc, wB = P.wB * SB.mix, inj = P.inject * 0.2, br = P.bright;
+  for (let i = 0; i < N; i++) {
+    const dA = PA.d2[i] * 1.8, dB = PB.d[i];
+    /* 運動 → 波場（帶號差分：亮/暗兩側形成偶極，向外擴散成環波） */
+    const q = (wA * dA * (0.6 + 0.9 * PA.edge[i]) * 4 + wB * dB * (0.6 + 0.9 * PB.edge[i]) * 1.0) * inj;
+    h[i] += q > 0.06 ? 0.06 : q < -0.06 ? -0.06 : q;
+    /* 運動 → 夜光能量 */
+    const em = (wA * Math.abs(dA) * 4 + wB * Math.abs(dB) * 5) * br;
+    if (em > Eg[i]) Eg[i] = Math.min(1.4, em);
+    flowU[i] = wA * PA.u[i] + wB * PB.u[i];
+    flowV[i] = wA * PA.v[i] + wB * PB.v[i];
+  }
+  /* 靜止時的微小起伏（極暗的呼吸） */
+  ambT = t * 0.25;
+  for (let y = 0; y < GH; y += 2) for (let x = 0; x < GW; x += 2) {
+    const a = noise3(x * 0.07, y * 0.12, ambT) * 0.0035, i = y * GW + x;
+    h[i] += a; h[i + 1] += a; h[i + GW] += a; h[i + GW + 1] += a;
+  }
+}
+
+/* ---------------- 2D 波動方程式 ---------------- */
+function waveStep() {
+  const c2 = Math.min(0.45, P.speed), dmp = P.damp;
+  for (let y = 1; y < GH - 1; y++) {
+    for (let x = 1, i = y * GW + 1; x < GW - 1; x++, i++) {
+      const lap = h[i - 1] + h[i + 1] + h[i - GW] + h[i + GW] - 4 * h[i];
+      let n = (2 * h[i] - hp[i] + c2 * lap) * dmp * sponge[i];
+      n *= 1 - 0.06 * Math.min(1, Math.abs(n) * 2.5);        // 強波較快衰減，擾動約 3 秒後回到海的節奏
+      hn[i] = n > 1.5 ? 1.5 : n < -1.5 ? -1.5 : n;
+    }
+  }
+  const t = hp; hp = h; h = hn; hn = t;
+  for (let x = 0; x < GW; x++) { h[x] = 0; h[(GH - 1) * GW + x] = 0; }
+  for (let y = 0; y < GH; y++) { h[y * GW] = 0; h[y * GW + GW - 1] = 0; }
+}
+
+function computeField() {
+  const br = P.bright;
+  for (let y = 1; y < GH - 1; y++) for (let x = 1; x < GW - 1; x++) {
+    const i = y * GW + x;
+    gX[i] = (h[i + 1] - h[i - 1]) * 0.5;
+    gY[i] = (h[i + GW] - h[i - GW]) * 0.5;
+    const e = (Math.abs(h[i]) * 5 + Eg[i]) * br;
+    E[i] = 1 - Math.exp(-1.25 * e);                        // 軟性飽和，避免整片過曝
+  }
+}
+
+/* ---------------- 墨線：等高線（marching squares） ---------------- */
+const LEVELS = [0.012, 0.03, 0.065, 0.13, 0.26];
+const WCLS = [1.3, 2.5, 4.2, 6.8];                  // 筆寬分級
+const NW = WCLS.length, NBUF = NB * NW, CAP = 9000;
+const segBuf = [], segCnt = new Int32Array(NBUF);
+for (let i = 0; i < NBUF; i++) segBuf.push(new Float32Array(CAP * 4));
+const brBuf = [], brCnt = new Int32Array(NB);       // 飛白毛刷細線
+for (let i = 0; i < NB; i++) brBuf.push(new Float32Array(CAP * 2 * 4));
+const EDGE_T = [[0, 0], [0, 0]];
+
+function pushSeg(x0, y0, x1, y1, e, speed, key, tq) {
+  /* 飛白：低能量處斷續，高能量處筆畫連貫 */
+  if (hash(key * 7 + tq) > 0.3 + 0.75 * e) return;
+  const j = (hash(key * 13 + 5) - 0.5) * 2.2;
+  const bin = Math.min(NB - 1, (e * NB) | 0);
+  const wv = (0.7 + 1.9 * Math.pow(e, 1.1)) * (0.65 + 0.7 * hash(key * 31 + 9)) * (0.7 + Math.min(1.3, speed * 25));
+  const wc = wv < 1.0 ? 0 : wv < 1.9 ? 1 : wv < 3.0 ? 2 : 3;
+  const bi = bin * NW + wc, k = segCnt[bi];
+  if (k >= CAP) return;
+  const a = segBuf[bi], o = k * 4;
+  a[o] = x0 + j; a[o + 1] = y0 + j; a[o + 2] = x1 - j; a[o + 3] = y1 + j;
+  segCnt[bi] = k + 1;
+  if (wc >= 2 && hash(key * 17 + tq * 3) < 0.6 && brCnt[bin] < CAP * 2) {      // 毛刷分叉
+    const dx = x1 - x0, dy = y1 - y0, l = Math.hypot(dx, dy) + 1e-3, nx = -dy / l, ny = dx / l;
+    const off = (hash(key * 5 + 2) - 0.5) * WCLS[wc] * 1.6, b = brBuf[bin], q = brCnt[bin]++ * 4;
+    b[q] = x0 + nx * off; b[q + 1] = y0 + ny * off; b[q + 2] = x1 + nx * off; b[q + 3] = y1 + ny * off;
+  }
+}
+function contours(time) {
+  segCnt.fill(0); brCnt.fill(0);
+  const tq = (time * 2.5) | 0;
+  for (let y = 0; y < GH - 1; y++) {
+    for (let x = 0; x < GW - 1; x++) {
+      const i = y * GW + x, a = h[i], b = h[i + 1], c = h[i + GW + 1], d = h[i + GW];
+      const mx = Math.max(a, b, c, d), mn = Math.min(a, b, c, d);
+      if (mx < LEVELS[0] && mn > -LEVELS[0]) continue;
+      const e = E[i], sp = Math.abs(a - hp[i]);
+      for (let li = 0; li < LEVELS.length * 2; li++) {
+        const L = li < LEVELS.length ? LEVELS[li] : -LEVELS[li - LEVELS.length];
+        if (!(mn < L && L < mx)) continue;
+        const cs = (a > L ? 1 : 0) | (b > L ? 2 : 0) | (c > L ? 4 : 0) | (d > L ? 8 : 0);
+        if (cs === 0 || cs === 15) continue;
+        // 邊: 0=上(a-b) 1=右(b-c) 2=下(d-c) 3=左(a-d)
+        let s1, s2 = -1, s3, s4;
+        switch (cs) {
+          case 1: case 14: s1 = 3; s2 = 0; break;
+          case 2: case 13: s1 = 0; s2 = 1; break;
+          case 3: case 12: s1 = 3; s2 = 1; break;
+          case 4: case 11: s1 = 1; s2 = 2; break;
+          case 5: s1 = 3; s2 = 0; s3 = 1; s4 = 2; break;
+          case 6: case 9: s1 = 0; s2 = 2; break;
+          case 7: case 8: s1 = 3; s2 = 2; break;
+          case 10: s1 = 0; s2 = 1; s3 = 3; s4 = 2; break;
+        }
+        const key = (i * 11 + li) | 0;
+        for (let pass = 0; pass < 2; pass++) {
+          const e1 = pass ? s3 : s1, e2 = pass ? s4 : s2;
+          if (e1 === undefined || e2 === undefined || e2 < 0) break;
+          let px0, py0, px1, py1;
+          for (let k = 0; k < 2; k++) {
+            const ed = k ? e2 : e1; let px, py;
+            if (ed === 0) { px = x + (L - a) / (b - a); py = y; }
+            else if (ed === 1) { px = x + 1; py = y + (L - b) / (c - b); }
+            else if (ed === 2) { px = x + (L - d) / (c - d); py = y + 1; }
+            else { px = x; py = y + (L - a) / (d - a); }
+            if (k) { px1 = px * CELL; py1 = py * CELL; } else { px0 = px * CELL; py0 = py * CELL; }
+          }
+          const lv = 0.55 + 0.45 * (li % LEVELS.length) / (LEVELS.length - 1);
+          pushSeg(px0, py0, px1, py1, Math.min(1, e * (0.55 + 0.6 * lv)), sp, key + pass * 977, tq);
+          if (cs !== 5 && cs !== 10) break;
+        }
+      }
+    }
+  }
+}
+function flushSegs() {
+  ictx.lineCap = 'round';
+  for (let bin = 0; bin < NB; bin++) {
+    const hot = bin >= NB - 2;
+    ictx.globalCompositeOperation = hot ? 'lighter' : 'source-over';
+    ictx.strokeStyle = BIN_STR[bin];
+    for (let wc = 0; wc < NW; wc++) {
+      const bi = bin * NW + wc, n = segCnt[bi];
+      if (!n) continue;
+      const a = segBuf[bi];
+      ictx.globalAlpha = hot ? 0.16 + wc * 0.03 : BIN_ALPHA[bin] * (0.7 + 0.1 * wc);
+      ictx.lineWidth = WCLS[wc];
+      ictx.beginPath();
+      for (let k = 0, o = 0; k < n; k++, o += 4) { ictx.moveTo(a[o], a[o + 1]); ictx.lineTo(a[o + 2], a[o + 3]); }
+      ictx.stroke();
+    }
+    const nb = brCnt[bin];
+    if (nb) {                                          // 毛刷細線
+      const b = brBuf[bin];
+      ictx.globalAlpha = hot ? 0.12 : 0.4; ictx.lineWidth = 0.8;
+      ictx.beginPath();
+      for (let k = 0, o = 0; k < nb; k++, o += 4) { ictx.moveTo(b[o], b[o + 1]); ictx.lineTo(b[o + 2], b[o + 3]); }
+      ictx.stroke();
+    }
+  }
+  ictx.globalAlpha = 1;
+}
+
+/* ---------------- 粒子：沿波面流動的筆觸 ---------------- */
+const NP_MAX = 3000;
+let npActive = 2400;
+const pX = new Float32Array(NP_MAX), pY = new Float32Array(NP_MAX), pVX = new Float32Array(NP_MAX), pVY = new Float32Array(NP_MAX);
+const pAge = new Float32Array(NP_MAX), pLife = new Float32Array(NP_MAX), pSeed = new Float32Array(NP_MAX);
+const PBUF = [], PCNT = new Int32Array(NB * 3);
+for (let i = 0; i < NB * 3; i++) PBUF.push(new Float32Array(NP_MAX * 4));
+function respawn(i) {
+  let best = -1, be = -1;
+  for (let k = 0; k < 5; k++) {
+    const cx = (Math.random() * (GW - 2) + 1) | 0, cy = (Math.random() * (GH - 2) + 1) | 0, e = E[cy * GW + cx];
+    if (e > be) { be = e; best = cy * GW + cx; }
+  }
+  const cx = best % GW, cy = (best / GW) | 0;
+  pX[i] = (cx + Math.random()) * CELL; pY[i] = (cy + Math.random()) * CELL;
+  pVX[i] = 0; pVY[i] = 0; pAge[i] = 0; pLife[i] = 0.8 + Math.random() * 2.4; pSeed[i] = Math.random();
+}
+function initParticles() { for (let i = 0; i < NP_MAX; i++) { respawn(i); pAge[i] = Math.random() * pLife[i]; } }
+function stepParticles(dt, time) {
+  PCNT.fill(0);
+  for (let i = 0; i < npActive; i++) {
+    pAge[i] += dt;
+    let x = pX[i], y = pY[i];
+    const cx = (x / CELL) | 0, cy = (y / CELL) | 0;
+    if (pAge[i] > pLife[i] || cx < 1 || cy < 1 || cx >= GW - 1 || cy >= GH - 1) { respawn(i); continue; }
+    const ci = cy * GW + cx, e = E[ci];
+    const gx = gX[ci], gy = gY[ci], gl = Math.hypot(gx, gy) + 1e-4;
+    const sg = h[ci] >= 0 ? 1 : -1, at = (30 + 170 * e) * Math.min(1, gl * 14);
+    const tvx = -gy / gl * sg * at, tvy = gx / gl * sg * at;
+    let tx = tvx - gx * 900 + clamp(flowU[ci], -1, 1) * CELL * 14 + 6 * Math.sin(pSeed[i] * 40 + time * 0.3);
+    let ty = tvy - gy * 900 + clamp(flowV[ci], -1, 1) * CELL * 14 + 2 * Math.cos(pSeed[i] * 30 + time * 0.2);
+    pVX[i] += (tx - pVX[i]) * 0.14; pVY[i] += (ty - pVY[i]) * 0.14;
+    const nx = x + pVX[i] * dt, ny = y + pVY[i] * dt;
+    const sp = Math.hypot(pVX[i], pVY[i]);
+    pX[i] = nx; pY[i] = ny;
+    const lifeK = Math.sin(Math.PI * Math.min(1, pAge[i] / pLife[i]));
+    const ee = e * lifeK;
+    if (ee < 0.11) continue;
+    const bin = Math.min(NB - 1, (ee * NB) | 0);
+    const w = 0.8 + 3.2 * ee + Math.min(1.5, sp / 140);
+    const wc = w < 1.7 ? 0 : w < 3 ? 1 : 2;
+    if (hash((i * 131 + (time * 20 | 0)) | 0) > 0.35 + 0.8 * ee) continue;     // 飛白
+    const bi = bin * 3 + wc, k = PCNT[bi]++, o = k * 4, a = PBUF[bi];
+    const tail = 0.05;
+    a[o] = nx - pVX[i] * tail; a[o + 1] = ny - pVY[i] * tail; a[o + 2] = nx; a[o + 3] = ny;
+  }
+  ictx.lineCap = 'round';
+  const PW = [1.0, 2.2, 3.6];
+  for (let bin = 0; bin < NB; bin++) {
+    const hot = bin >= NB - 2;
+    ictx.globalCompositeOperation = hot ? 'lighter' : 'source-over';
+    ictx.strokeStyle = BIN_STR[bin];
+    for (let wc = 0; wc < 3; wc++) {
+      const bi = bin * 3 + wc, n = PCNT[bi];
+      if (!n) continue;
+      const a = PBUF[bi];
+      ictx.globalAlpha = hot ? 0.3 : 0.55; ictx.lineWidth = PW[wc];
+      ictx.beginPath();
+      for (let k = 0, o = 0; k < n; k++, o += 4) { ictx.moveTo(a[o], a[o + 1]); ictx.lineTo(a[o + 2], a[o + 3]); }
+      ictx.stroke();
+    }
+  }
+  ictx.globalAlpha = 1;
+}
+
+/* ---------------- 渲染 ---------------- */
+function render(dt, time) {
+  /* 1. 墨的殘影：低透明度黑色覆蓋 */
+  ictx.globalCompositeOperation = 'source-over';
+  ictx.fillStyle = 'rgba(0,2,8,' + clamp(P.trail * Math.min(2, dt * 60), 0.01, 0.4).toFixed(3) + ')';
+  ictx.fillRect(0, 0, OW, OH);
+  /* 2. 墨線與粒子 */
+  contours(time); flushSegs();
+  stepParticles(dt, time);
+  /* 3. 呈現：墨 + 夜光暈 + 輝光 */
+  octx.globalCompositeOperation = 'source-over';
+  octx.fillStyle = '#000'; octx.fillRect(0, 0, OW, OH);
+  octx.drawImage(ink, 0, 0);
+  const px = glowImg.data;
+  for (let i = 0, j = 0; i < N; i++, j += 4) {
+    const e = E[i], k = e * e * 0.5, li = Math.min(255, (e * 190) | 0) * 3;
+    px[j] = LUT[li] * k; px[j + 1] = LUT[li + 1] * k; px[j + 2] = LUT[li + 2] * k; px[j + 3] = 255;
+  }
+  gctx.putImageData(glowImg, 0, 0);
+  octx.globalCompositeOperation = 'lighter';
+  octx.imageSmoothingEnabled = true; octx.imageSmoothingQuality = 'high';
+  octx.globalAlpha = 0.45; octx.drawImage(gcv, 0, 0, OW, OH);
+  b1ctx.drawImage(ink, 0, 0, 480, 270); b2ctx.drawImage(bl1, 0, 0, 120, 68);
+  octx.globalAlpha = 0.42 * Math.min(1.5, P.bright); octx.drawImage(bl2, 0, 0, OW, OH);
+  octx.globalAlpha = 1; octx.globalCompositeOperation = 'source-over';
+}
+
+/* ---------------- 主迴圈 ---------------- */
+let lastTs = 0, accA = 0, accW = 0, rafId = 0, lastRaf = performance.now();
+let fpsAcc = 0, fpsN = 0, fps = 60, lowSecs = 0, goodSecs = 0, badSecs = 0, frozenSecs = 0, lastSig = -1, lastReinit = 0, nFrames = 0;
+function frame(ts) {
+  rafId = requestAnimationFrame(frame);
+  const now = performance.now(); lastRaf = now;
+  let dt = (ts - lastTs) / 1000; lastTs = ts; if (!(dt > 0)) dt = 1 / 60; if (dt > 0.05) dt = 0.05;
+  const okA = stepSource(SA, now, dt), okB = stepSource(SB, now, dt);
+  accA += dt;
+  if (accA >= 1 / 30) { accA %= 1 / 30; analysisTick(now, okA, okB); }
+  accW += dt; let steps = 0;
+  while (accW >= 1 / 60 && steps < 3) { waveStep(); accW -= 1 / 60; steps++; }
+  if (accW > 0.1) accW = 0;
+  const dk = Math.pow(0.975, dt * 60);              // 夜光約 3 秒回到暗
+  for (let i = 0; i < N; i++) Eg[i] *= dk;
+  computeField();
+  render(dt, now / 1000);
+  fpsAcc += dt; fpsN++; nFrames++;
+  if (fpsAcc >= 1) { fps = fpsN / fpsAcc; fpsAcc = 0; fpsN = 0; secondly(); }
+}
+function sigOf() {
+  let s = 0; for (let i = 0; i < N; i += 7) s += Math.abs(h[i]) * 1000 + Eg[i];
+  return s;
+}
+function secondly() {
+  /* 自動調降 / 回升粒子數 */
+  if (fps < 42) { badSecs++; goodSecs = 0; if (badSecs >= 2) { npActive = Math.max(600, (npActive * 0.8) | 0); badSecs = 0; } }
+  else if (fps > 57) { goodSecs++; badSecs = 0; if (goodSecs >= 10) { npActive = Math.min(NP_MAX, npActive + 200); goodSecs = 0; } }
+  else { badSecs = goodSecs = 0; }
+  /* 看門狗 */
+  lowSecs = fps < 12 ? lowSecs + 1 : 0;
+  const sig = sigOf();
+  frozenSecs = (sig === lastSig) ? frozenSecs + 1 : 0; lastSig = sig;
+  if (!isFinite(sig)) reinit('nan');
+  else if (lowSecs >= 15) reinit('low-fps');
+  else if (frozenSecs >= 20) reinit('frozen');
+}
+setInterval(() => {                                  // rAF 本身停擺
+  if (!document.hidden && performance.now() - lastRaf > 4000) { cancelAnimationFrame(rafId); lastTs = 0; rafId = requestAnimationFrame(frame); reinit('raf-stall'); }
+}, 1000);
+
+function resetFields() {
+  h.fill(0); hp.fill(0); hn.fill(0); Eg.fill(0); E.fill(0); gX.fill(0); gY.fill(0); flowU.fill(0); flowV.fill(0);
+  PA.primed = false; PB.primed = false; lowSecs = frozenSecs = 0; lastSig = -1; fpsAcc = 0; fpsN = 0;
+  initParticles();
+}
+function reinit(why) {
+  const now = performance.now();
+  if (now - lastReinit < 30000) return;
+  lastReinit = now;
+  try { console.warn('[watchdog] reinit:', why); } catch (e) {}
+  resetFields(); clearAll();
+  npActive = Math.max(800, (npActive * 0.7) | 0);
+  applyChoice(SA, P.srcA, 'A'); applyChoice(SB, P.srcB, 'B');
+}
+
+/* ---------------- 全螢幕 / 鍵盤 ---------------- */
+function goFull() {
+  const el = document.documentElement;
+  if (!document.fullscreenElement && el.requestFullscreen) el.requestFullscreen().catch(() => {});
+}
+let gestured = false;
+function onGesture() { if (!gestured) { gestured = true; goFull(); } }
+addEventListener('pointerdown', onGesture); addEventListener('keydown', onGesture);
+goFull();
+
+/* ---------------- 錄影（R） ---------------- */
+let rec = null, recChunks = [], recExt = 'webm';
+function pickMime() {
+  const c = ['video/mp4;codecs=avc1.640028', 'video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+  for (const m of c) { try { if (window.MediaRecorder && MediaRecorder.isTypeSupported(m)) return m; } catch (e) {} }
+  return '';
+}
+function toggleRec() {
+  if (rec && rec.state === 'recording') { rec.stop(); return; }
+  if (!window.MediaRecorder || !out.captureStream) return;
+  const mime = pickMime();
+  try {
+    const st = out.captureStream(60);
+    rec = new MediaRecorder(st, mime ? { mimeType: mime, videoBitsPerSecond: 16e6 } : { videoBitsPerSecond: 16e6 });
+  } catch (e) { rec = null; return; }
+  recExt = /mp4/.test(rec.mimeType || mime) ? 'mp4' : 'webm'; recChunks = [];
+  rec.ondataavailable = ev => { if (ev.data && ev.data.size) recChunks.push(ev.data); };
+  rec.onstop = () => {
+    document.title = '電氣藍墨';
+    const blob = new Blob(recChunks, { type: rec.mimeType || ('video/' + recExt) });
+    download(blob, 'electric-blue-ink-' + stamp() + '.' + recExt); recChunks = [];
+  };
+  rec.start(1000); document.title = '● REC';
+}
+function stamp() { const d = new Date(), p = n => String(n).padStart(2, '0'); return d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '-' + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds()); }
+function download(blob, name) {
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+}
+/* 每小時一張「生成畫面」PNG（不含任何攝影機原始影像） */
+let lastShot = Date.now();
+setInterval(() => {
+  if (!P.hourly || Date.now() - lastShot < 3600e3) return;
+  lastShot = Date.now();
+  out.toBlob(b => { if (b) download(b, 'electric-blue-ink-' + stamp() + '.png'); }, 'image/png');
+}, 30000);
+
+/* ---------------- 隱藏參數面板（H） ---------------- */
+const panel = document.getElementById('panel');
+const SL = [
+  ['speed', '波速', 0.05, 0.45, 0.01], ['damp', '阻尼（保留率）', 0.95, 0.999, 0.001], ['bright', '亮度', 0.3, 2, 0.05],
+  ['wA', 'A 路 海面權重', 0, 2, 0.05], ['wB', 'B 路 觀眾權重', 0, 2, 0.05],
+  ['trail', '殘影消退（越小越長）', 0.015, 0.25, 0.005], ['inject', '動態注入強度', 0.2, 3, 0.05], ['gate', '雜訊門檻', 0, 0.08, 0.002]
+];
+function buildPanel() {
+  let html = '<h4>電氣藍墨 · 參數（H 關閉　R 錄影　F 全螢幕）</h4>';
+  for (const [k, name, mn, mx, st] of SL)
+    html += '<label><div class="row"><span>' + name + '</span><span id="v_' + k + '"></span></div><input type="range" id="s_' + k + '" min="' + mn + '" max="' + mx + '" step="' + st + '"></label>';
+  html += '<div class="sep"></div>';
+  html += '<label>A 路 海面來源<select id="selA"></select></label>';
+  html += '<label>B 路 觀眾來源<select id="selB"></select></label>';
+  html += '<label>載入 MP4 海浪影片（循環播放）<input type="file" id="file" accept="video/*,.mp4"></label>';
+  html += '<label><input type="checkbox" id="mirB"> B 路左右鏡像</label>';
+  html += '<label><input type="checkbox" id="hourly"> 每小時自動存一張生成畫面 PNG</label>';
+  html += '<button id="rescan">重新掃描攝影機</button> <button id="reset">還原預設</button>';
+  html += '<div class="sep"></div><div id="stat"></div>';
+  panel.innerHTML = html;
+  for (const [k] of SL) {
+    const s = document.getElementById('s_' + k), v = document.getElementById('v_' + k);
+    s.value = P[k]; v.textContent = (+P[k]).toFixed(3);
+    s.addEventListener('input', () => { P[k] = parseFloat(s.value); v.textContent = P[k].toFixed(3); savePrefs(); });
+  }
+  document.getElementById('selA').addEventListener('change', e => { P.srcA = e.target.value; savePrefs(); applyChoice(SA, P.srcA, 'A'); });
+  document.getElementById('selB').addEventListener('change', e => { P.srcB = e.target.value; savePrefs(); applyChoice(SB, P.srcB, 'B'); });
+  document.getElementById('mirB').checked = P.mirrorB;
+  document.getElementById('mirB').addEventListener('change', e => { P.mirrorB = e.target.checked; savePrefs(); });
+  document.getElementById('hourly').checked = P.hourly;
+  document.getElementById('hourly').addEventListener('change', e => { P.hourly = e.target.checked; lastShot = Date.now(); savePrefs(); });
+  document.getElementById('file').addEventListener('change', e => {
+    const f = e.target.files && e.target.files[0]; if (!f) return;
+    if (fileURL) URL.revokeObjectURL(fileURL);
+    fileURL = URL.createObjectURL(f); fileName = f.name;
+    P.srcA = 'file'; savePrefs(); fillSelects(); applyChoice(SA, 'file', 'A');
+  });
+  document.getElementById('rescan').addEventListener('click', () => scanDevices(true));
+  document.getElementById('reset').addEventListener('click', () => {
+    Object.assign(P, DEF); savePrefs(); buildPanel(); fillSelects(); applyChoice(SA, P.srcA, 'A'); applyChoice(SB, P.srcB, 'B');
+  });
+  fillSelects();
+}
+function fillSelects() {
+  const a = document.getElementById('selA'), b = document.getElementById('selB'); if (!a || !b) return;
+  const lab = (d, i) => (d.label || ('攝影機 ' + (i + 1)));
+  let ha = '<option value="auto">自動（第 1 支攝影機）</option><option value="sim">模擬海浪</option>';
+  if (fileURL) ha += '<option value="file">影片檔：' + fileName.replace(/[<&]/g, '') + '</option>';
+  let hb = '<option value="auto">自動（第 2 支攝影機）</option><option value="off">關閉</option>';
+  devices.forEach((d, i) => { const o = '<option value="' + d.deviceId + '">' + lab(d, i).replace(/[<&]/g, '') + '</option>'; ha += o; hb += o; });
+  a.innerHTML = ha; b.innerHTML = hb;
+  a.value = [...a.options].some(o => o.value === P.srcA) ? P.srcA : 'auto';
+  b.value = [...b.options].some(o => o.value === P.srcB) ? P.srcB : 'auto';
+}
+setInterval(() => {
+  const s = document.getElementById('stat'); if (!s || !document.body.classList.contains('ui')) return;
+  s.textContent = 'fps ' + fps.toFixed(0) + '　粒子 ' + npActive + '　A:' + (SA.mix > 0.5 ? SA.kind : '模擬') + '　B:' + (SB.mix > 0.5 ? '在線' : '無');
+}, 500);
+function togglePanel() { document.body.classList.toggle('ui'); }
+addEventListener('keydown', e => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const k = e.key.toLowerCase();
+  if (k === 'h') togglePanel();
+  else if (k === 'r') toggleRec();
+  else if (k === 'f') { if (document.fullscreenElement) document.exitFullscreen(); else goFull(); }
+});
+
+/* ---------------- 攝影機掃描與自動啟動 ---------------- */
+async function scanDevices(askPermission) {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
+  try {
+    if (askPermission || !devices.length) {                       // 取得權限後 enumerateDevices 才有 label / deviceId
+      try { const t = await navigator.mediaDevices.getUserMedia({ video: true, audio: false }); t.getTracks().forEach(x => x.stop()); } catch (e) {}
+    }
+    const all = await navigator.mediaDevices.enumerateDevices();
+    devices = all.filter(d => d.kind === 'videoinput' && d.deviceId);
+  } catch (e) { devices = []; }
+  fillSelects();
+}
+async function startInputs() {
+  await scanDevices(true);
+  if (SA.kind !== 'file') applyChoice(SA, P.srcA, 'A');
+  applyChoice(SB, P.srcB, 'B');
+}
+if (navigator.mediaDevices && navigator.mediaDevices.addEventListener)
+  navigator.mediaDevices.addEventListener('devicechange', async () => {
+    await scanDevices(false);
+    if (SA.kind === 'sim' && P.srcA === 'auto' && devices[0]) applyChoice(SA, 'auto', 'A');
+    if (SB.kind === 'off' && P.srcB === 'auto' && devices[1]) applyChoice(SB, 'auto', 'B');
+  });
+
+/* ---------------- 啟動 ---------------- */
+buildPanel();
+resetFields();
+rafId = requestAnimationFrame(frame);
+setTimeout(() => { startInputs(); }, 2000);            // 延遲 2 秒自動啟動攝影機
+
+// 供除錯 / 驗收（不顯示於畫面）
+window.__ebi = { P, SA, SB, get fps() { return fps; }, get frames() { return nFrames; }, get agc() { return agcM; }, h: () => h, Eg: () => Eg, E: () => E,
+  get devices() { return devices; }, reinit, applyChoice, useFile(u, role) { fileURL = u; fileName = 't'; applyChoice(role === 'B' ? SB : SA, 'file', role); }, get PB() { return PB; } };
+})();
+</script>
+</body>
+</html>
