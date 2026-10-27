@@ -1,6 +1,7 @@
 const express = require('express');
 const pool = require('../config/db');
 const { notifyNewResource } = require('../notifications/notify');
+const requireApiKey = require('../middleware/require-api-key');
 
 function createResourceRouter(table, allowedColumns) {
   const router = express.Router();
@@ -46,7 +47,7 @@ function createResourceRouter(table, allowedColumns) {
     }
   });
 
-  router.post('/', async (req, res) => {
+  router.post('/', requireApiKey, async (req, res) => {
     try {
       const fields = Object.keys(req.body).filter(k => allowedColumns.includes(k));
       if (fields.length === 0) return res.status(400).json({ error: 'No valid fields provided' });
@@ -68,7 +69,7 @@ function createResourceRouter(table, allowedColumns) {
     }
   });
 
-  router.put('/:id', async (req, res) => {
+  router.put('/:id', requireApiKey, async (req, res) => {
     try {
       const id = parseInt(req.params.id, 10);
       if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });
@@ -91,7 +92,7 @@ function createResourceRouter(table, allowedColumns) {
     }
   });
 
-  router.delete('/:id', async (req, res) => {
+  router.delete('/:id', requireApiKey, async (req, res) => {
     try {
       const id = parseInt(req.params.id, 10);
       if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });
