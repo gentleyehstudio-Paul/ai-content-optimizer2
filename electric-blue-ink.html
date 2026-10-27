@@ -10,6 +10,21 @@
   #out{position:fixed;left:0;top:0;width:100%;height:100%;object-fit:contain;background:#000;display:block}
   /* 影像來源不可 display:none，否則部分瀏覽器會停止解碼、擷取到靜態畫面 */
   video.src{position:fixed;left:0;top:0;width:160px;height:90px;opacity:0;pointer-events:none}
+  #bar{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom));transform:translateX(-50%);display:flex;gap:10px;z-index:6;
+    opacity:0;pointer-events:none;transition:opacity .4s}
+  body.tb #bar{opacity:1;pointer-events:auto}
+  body.tb{cursor:default}
+  #bar button{font:14px system-ui,"Noto Sans TC",sans-serif;color:#BFF3FF;background:rgba(5,10,24,.72);border:1px solid #1B4F8C;border-radius:22px;
+    padding:10px 16px;min-width:76px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);cursor:pointer;touch-action:manipulation}
+  #bar button.on{background:rgba(27,79,140,.85);border-color:#3FA9F5}
+  #bar button.rec{background:rgba(140,20,30,.85);border-color:#ff6b6b;color:#fff}
+  #dlg{display:none;position:fixed;inset:0;z-index:9;background:rgba(0,0,0,.9);align-items:center;justify-content:center;flex-direction:column;gap:12px;
+    font:14px/1.5 system-ui,"Noto Sans TC",sans-serif;color:#9fc8ee;padding:16px;box-sizing:border-box;text-align:center}
+  #dlg.show{display:flex}
+  #dlg video{max-width:100%;max-height:62%;background:#000;border:1px solid #1B4F8C;border-radius:4px}
+  #dlg .btns{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+  #dlg button{font:15px system-ui,"Noto Sans TC",sans-serif;color:#BFF3FF;background:#0A1A3F;border:1px solid #3FA9F5;border-radius:22px;padding:10px 18px;cursor:pointer}
+  #dlg small{opacity:.7}
   #panel{display:none;position:fixed;right:12px;top:12px;width:280px;max-height:calc(100% - 24px);overflow:auto;
     background:rgba(2,4,10,.88);border:1px solid #1B4F8C;color:#9fc8ee;font:12px/1.5 system-ui,"Noto Sans TC",sans-serif;
     padding:10px 12px;border-radius:4px;z-index:5}
@@ -26,6 +41,17 @@
 <body>
 <canvas id="out" width="1920" height="1080"></canvas>
 <div id="panel"></div>
+<div id="bar">
+  <button id="bCam">開啟鏡頭</button>
+  <button id="bFlip">翻轉鏡頭</button>
+  <button id="bRec">錄影</button>
+  <button id="bFull">全螢幕</button>
+</div>
+<div id="dlg">
+  <video id="dlgVid" controls playsinline muted loop></video>
+  <div class="btns"><button id="dlgShare">儲存到相簿 / 分享</button><button id="dlgDl">下載檔案</button><button id="dlgClose">關閉</button></div>
+  <small id="dlgHint"></small>
+</div>
 <script>
 (() => {
 'use strict';
@@ -46,6 +72,7 @@ const DEF = {
   bright: 1.0,    // 亮度
   wA: 1.0,        // A 路（海面）權重
   wB: 0.7,        // B 路（觀眾）權重
+  bleed: 0.30,    // 墨水暈染（擴散）強度
   trail: 0.055,   // 每幀黑色覆蓋透明度（越小殘影越長）
   gate: 0.02,     // 影格差分雜訊門檻
   inject: 1.0,    // 動態注入波場強度
@@ -186,7 +213,7 @@ async function openCam(S) {
   try {
     if (S.stream) S.stream.getTracks().forEach(t => { try { t.stop(); } catch (e) {} });
     const stream = await navigator.mediaDevices.getUserMedia({
-      video: { deviceId: { exact: S.devId }, width: { ideal: 640 }, height: { ideal: 360 }, frameRate: { ideal: 30 } }, audio: false });
+      video: { ...((S.devId === 'user' || S.devId === 'environment') ? { facingMode: { ideal: S.devId } } : { deviceId: { exact: S.devId } }), width: { ideal: 640 }, height: { ideal: 360 }, frameRate: { ideal: 30 } }, audio: false });
     S.stream = stream; S.dead = false;
     stream.getVideoTracks().forEach(t => { t.onended = () => { S.dead = true; }; });
     S.video.srcObject = stream;
@@ -197,7 +224,11 @@ async function openCam(S) {
 }
 function applyChoice(S, choice, role) {
   stopSrc(S);
-  if (choice === 'auto') choice = role === 'A' ? (devices[0] ? devices[0].deviceId : 'sim') : (devices[1] ? devices[1].deviceId : 'off');
+  if (choice === 'auto') {
+    /* 手機等只有一支鏡頭的觸控裝置：鏡頭當作互動（B 路），A 路用模擬海浪 */
+    const solo = devices.length === 1 && matchMedia('(pointer:coarse)').matches;
+    choice = role === 'A' ? (!solo && devices[0] ? devices[0].deviceId : 'sim') : (solo ? devices[0].deviceId : devices[1] ? devices[1].deviceId : 'off');
+  }
   if (choice === 'sim' || choice === 'off') { S.kind = role === 'A' ? 'sim' : 'off'; return; }
   if (choice === 'file') {
     if (!fileURL) { S.kind = role === 'A' ? 'sim' : 'off'; return; }
@@ -286,7 +317,7 @@ function analysisTick(now, okA, okB) {
   analysePath(PA, P.gate * SA.mix);   // 模擬海浪無雜訊，不需門檻
   /* B 路 */
   if (okB) {
-    grabGray(SB, P.mirrorB, PB.raw); analysePath(PB, P.gate);
+    grabGray(SB, P.mirrorB && SB.devId !== 'environment', PB.raw); analysePath(PB, P.gate);
   } else if (PB.primed) { PB.primed = false; PB.d.fill(0); PB.u.fill(0); PB.v.fill(0); PB.edge.fill(0); }
 
   /* A 路自動增益：以慢速平均的差分量正規化，不同曝光 / 場景都落在相近的動態範圍 */
@@ -516,6 +547,18 @@ function render(dt, time) {
   ictx.fillStyle = 'rgba(0,2,8,' + clamp(P.trail * Math.min(2, dt * 60), 0.01, 0.4).toFixed(3) + ')';
   ictx.fillRect(0, 0, OW, OH);
   /* 2. 墨線與粒子 */
+  /* 暈染：把墨層模糊後以低透明度蓋回自己 → 墨向外滲開（守恆擴散，不增亮） */
+  if (P.bleed > 0.001) {
+    b1ctx.drawImage(ink, 0, 0, 480, 270);
+    ictx.globalCompositeOperation = 'source-over'; ictx.imageSmoothingEnabled = true;
+    const k = Math.min(2, dt * 60);
+    ictx.globalAlpha = Math.min(0.5, P.bleed * 0.4 * k);
+    ictx.drawImage(bl1, 0, 0, OW, OH);
+    ictx.globalCompositeOperation = 'lighter';                       // 補回擴散損失的亮度，墨暈開但不變暗
+    ictx.globalAlpha = Math.min(0.12, P.bleed * 0.07 * k);
+    ictx.drawImage(bl1, 0, 0, OW, OH);
+    ictx.globalAlpha = 1; ictx.globalCompositeOperation = 'source-over';
+  }
   contours(time); flushSegs();
   stepParticles(dt, time);
   /* 3. 呈現：墨 + 夜光暈 + 輝光 */
@@ -609,8 +652,10 @@ function pickMime() {
   for (const m of c) { try { if (window.MediaRecorder && MediaRecorder.isTypeSupported(m)) return m; } catch (e) {} }
   return '';
 }
-function toggleRec() {
+let recUI = false, recT0 = 0;
+function toggleRec(fromUI) {
   if (rec && rec.state === 'recording') { rec.stop(); return; }
+  recUI = !!fromUI;
   if (!window.MediaRecorder || !out.captureStream) return;
   const mime = pickMime();
   try {
@@ -621,10 +666,12 @@ function toggleRec() {
   rec.ondataavailable = ev => { if (ev.data && ev.data.size) recChunks.push(ev.data); };
   rec.onstop = () => {
     document.title = '電氣藍墨';
-    const blob = new Blob(recChunks, { type: rec.mimeType || ('video/' + recExt) });
-    download(blob, 'electric-blue-ink-' + stamp() + '.' + recExt); recChunks = [];
+    const blob = new Blob(recChunks, { type: (rec.mimeType || ('video/' + recExt)).split(';')[0] });
+    const name = 'electric-blue-ink-' + stamp() + '.' + recExt; recChunks = [];
+    if (recUI) showDialog(blob, name); else download(blob, name);   // 按鈕錄影 → 預覽 / 存相簿；R 鍵 → 直接下載
+    updateBar();
   };
-  rec.start(1000); document.title = '● REC';
+  rec.start(1000); recT0 = Date.now(); document.title = '● REC'; updateBar();
 }
 function stamp() { const d = new Date(), p = n => String(n).padStart(2, '0'); return d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '-' + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds()); }
 function download(blob, name) {
@@ -645,7 +692,7 @@ const panel = document.getElementById('panel');
 const SL = [
   ['speed', '波速', 0.05, 0.45, 0.01], ['damp', '阻尼（保留率）', 0.95, 0.999, 0.001], ['bright', '亮度', 0.3, 2, 0.05],
   ['wA', 'A 路 海面權重', 0, 2, 0.05], ['wB', 'B 路 觀眾權重', 0, 2, 0.05],
-  ['trail', '殘影消退（越小越長）', 0.015, 0.25, 0.005], ['inject', '動態注入強度', 0.2, 3, 0.05], ['gate', '雜訊門檻', 0, 0.08, 0.002]
+  ['bleed', '墨水暈染', 0, 0.8, 0.02], ['trail', '殘影消退（越小越長）', 0.015, 0.25, 0.005], ['inject', '動態注入強度', 0.2, 3, 0.05], ['gate', '雜訊門檻', 0, 0.08, 0.002]
 ];
 function buildPanel() {
   let html = '<h4>電氣藍墨 · 參數（H 關閉　R 錄影　F 全螢幕）</h4>';
@@ -703,7 +750,7 @@ addEventListener('keydown', e => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   const k = e.key.toLowerCase();
   if (k === 'h') togglePanel();
-  else if (k === 'r') toggleRec();
+  else if (k === 'r') toggleRec(false);
   else if (k === 'f') { if (document.fullscreenElement) document.exitFullscreen(); else goFull(); }
 });
 
@@ -723,6 +770,7 @@ async function startInputs() {
   await scanDevices(true);
   if (SA.kind !== 'file') applyChoice(SA, P.srcA, 'A');
   applyChoice(SB, P.srcB, 'B');
+  if (typeof updateBar === 'function') updateBar();
 }
 if (navigator.mediaDevices && navigator.mediaDevices.addEventListener)
   navigator.mediaDevices.addEventListener('devicechange', async () => {
@@ -730,6 +778,62 @@ if (navigator.mediaDevices && navigator.mediaDevices.addEventListener)
     if (SA.kind === 'sim' && P.srcA === 'auto' && devices[0]) applyChoice(SA, 'auto', 'A');
     if (SB.kind === 'off' && P.srcB === 'auto' && devices[1]) applyChoice(SB, 'auto', 'B');
   });
+
+/* ---------------- 觸控工具列 / 鏡頭互動 / 錄影後存相簿 ---------------- */
+let camFacing = 'user', barTimer = 0;
+const $ = id => document.getElementById(id);
+function showBar() {
+  document.body.classList.add('tb'); clearTimeout(barTimer);
+  barTimer = setTimeout(() => document.body.classList.remove('tb'), 4000);
+}
+function camIsOn() { return SB.kind === 'cam'; }
+function updateBar() {
+  $('bCam').textContent = camIsOn() ? '關閉鏡頭' : '開啟鏡頭'; $('bCam').classList.toggle('on', camIsOn());
+  const r = rec && rec.state === 'recording';
+  $('bRec').classList.toggle('rec', !!r);
+  $('bRec').textContent = r ? '停止 ' + Math.floor((Date.now() - recT0) / 1000) + 's' : '錄影';
+}
+async function camOn() {
+  if (!devices.length) await scanDevices(false);
+  P.srcB = camFacing; savePrefs(); fillSelects();
+  applyChoice(SB, camFacing, 'B');                  // 即時互動：鏡頭畫面的動作會直接擾動波場
+  updateBar();
+}
+function camOff() { P.srcB = 'off'; savePrefs(); fillSelects(); applyChoice(SB, 'off', 'B'); updateBar(); }
+$('bCam').addEventListener('click', () => { camIsOn() ? camOff() : camOn(); showBar(); });
+$('bFlip').addEventListener('click', () => {
+  camFacing = camFacing === 'user' ? 'environment' : 'user';
+  if (camIsOn()) camOn(); showBar();
+});
+$('bRec').addEventListener('click', () => { toggleRec(true); showBar(); updateBar(); });
+$('bFull').addEventListener('click', () => { if (document.fullscreenElement) document.exitFullscreen(); else goFull(); showBar(); });
+['pointerdown', 'pointermove', 'touchstart'].forEach(ev => addEventListener(ev, showBar, { passive: true }));
+setInterval(() => { if (rec && rec.state === 'recording') updateBar(); }, 500);
+if (matchMedia('(pointer:coarse)').matches) showBar();   // 觸控裝置一開始顯示一次工具列
+
+let dlgBlob = null, dlgName = '', dlgURL = '';
+function showDialog(blob, name) {
+  dlgBlob = blob; dlgName = name;
+  if (dlgURL) URL.revokeObjectURL(dlgURL);
+  dlgURL = URL.createObjectURL(blob);
+  $('dlgVid').src = dlgURL; $('dlgVid').play().catch(() => {});
+  const f = new File([blob], name, { type: blob.type });
+  const canShare = !!(navigator.canShare && navigator.share && navigator.canShare({ files: [f] }));
+  $('dlgShare').style.display = canShare ? '' : 'none';
+  $('dlgHint').textContent = canShare
+    ? 'iPhone：按「儲存到相簿 / 分享」後選「儲存影片」；Android：選相簿或 Google 相簿。'
+    : '此瀏覽器不支援直接分享，請按「下載檔案」，檔案會存到「下載」資料夾，可從相簿 / 檔案 App 開啟。';
+  $('dlg').classList.add('show');
+}
+function closeDialog() { $('dlg').classList.remove('show'); $('dlgVid').pause(); $('dlgVid').removeAttribute('src'); }
+$('dlgClose').addEventListener('click', closeDialog);
+$('dlgDl').addEventListener('click', () => { if (dlgBlob) download(dlgBlob, dlgName); });
+$('dlgShare').addEventListener('click', async () => {      // 需由使用者點擊觸發，才能叫出系統分享 → 存相簿
+  if (!dlgBlob) return;
+  try { await navigator.share({ files: [new File([dlgBlob], dlgName, { type: dlgBlob.type })], title: '電氣藍墨' }); }
+  catch (e) { if (e && e.name !== 'AbortError') download(dlgBlob, dlgName); }
+});
+updateBar();
 
 /* ---------------- 啟動 ---------------- */
 buildPanel();
