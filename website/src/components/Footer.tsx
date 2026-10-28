@@ -86,6 +86,14 @@ export function Footer() {
                   聯絡我們
                 </Link>
               </li>
+              <li>
+                <Link
+                  href="/privacy-policy"
+                  className="text-[14px] text-ink hover:text-red"
+                >
+                  隱私權政策
+                </Link>
+              </li>
             </ul>
           </div>
 
@@ -122,6 +130,16 @@ export function Footer() {
                   className="text-[14px] text-ink hover:text-red"
                 >
                   LinkedIn
+                </a>
+              </li>
+              <li>
+                <a
+                  href="https://line.me/R/ti/p/%40kij2619w"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[14px] text-ink hover:text-red"
+                >
+                  LINE 官方帳號
                 </a>
               </li>
             </ul>

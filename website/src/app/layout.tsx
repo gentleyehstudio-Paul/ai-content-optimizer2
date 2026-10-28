@@ -84,6 +84,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               areaServed: { "@type": "Country", name: "TW" },
               sameAs: [
                 "https://www.linkedin.com/in/paul-yeh-82a185154/",
+                "https://line.me/R/ti/p/%40kij2619w",
               ],
             }),
           }}
