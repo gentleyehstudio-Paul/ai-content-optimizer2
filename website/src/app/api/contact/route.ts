@@ -9,8 +9,19 @@ const SERVICES: Record<string, string> = {
   printscale: "PrintScale-AI 試用",
   training: "企業 AI 培訓",
   brand: "品牌視覺設計",
+  "ai-team": "AI 團隊診斷（/ai-team）",
   other: "其他",
 };
+
+// /ai-team 頁的版本選項（白名單）
+const PLANS: Record<string, string> = {
+  personal: "個人版",
+  business: "企業版",
+  manufacturing: "製造業（企業版）",
+};
+
+// 來源頁面代碼：只接受小寫英數與連字號
+const SOURCE_RE = /^[a-z0-9-]{1,40}$/;
 
 const MAX_BODY_BYTES = 20_000;
 const DEFAULT_TO = "gentleyehstudio@gmail.com";
@@ -65,6 +76,12 @@ export async function POST(req: Request) {
   const phone = oneLine(body.phone, 50);
   const message = String(body.message ?? "").trim().slice(0, 4000);
   const service = SERVICES[String(body.service ?? "")] ?? "未選擇";
+  // 以下為選填欄位（/ai-team 頁使用），其他頁不送就不會出現在信裡
+  const sourceRaw = oneLine(body.source, 40);
+  const source = SOURCE_RE.test(sourceRaw) ? sourceRaw : "";
+  const plan = PLANS[String(body.plan ?? "")] ?? "";
+  const timeslot = oneLine(body.timeslot, 200);
+  const attribution = oneLine(body.attribution, 600);
 
   if (!name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return err("invalid", 400);
@@ -79,9 +96,17 @@ export async function POST(req: Request) {
     return err("server_config", 500);
   }
 
-  const subject = `【官網詢價】${service}｜${name}`;
+  const subject = source
+    ? `【官網詢價｜${source}】${service}｜${name}`
+    : `【官網詢價】${service}｜${name}`;
+  const extra: [string, string][] = [];
+  if (source) extra.push(["來源頁面", source]);
+  if (plan) extra.push(["版本", plan]);
+  if (timeslot) extra.push(["方便的時段", timeslot]);
+  if (attribution) extra.push(["廣告參數", attribution]);
   const text = [
     `服務項目：${service}`,
+    ...extra.map(([k, v]) => `${k}：${v}`),
     `姓名：${name}`,
     `Email：${email}`,
     `公司：${company || "—"}`,
@@ -91,6 +116,7 @@ export async function POST(req: Request) {
     message || "—",
   ].join("\n");
   const html = `<p><b>服務項目：</b>${esc(service)}</p>
+${extra.map(([k, v]) => `<p><b>${esc(k)}：</b>${esc(v)}</p>`).join("\n")}
 <p><b>姓名：</b>${esc(name)}</p>
 <p><b>Email：</b>${esc(email)}</p>
 <p><b>公司：</b>${esc(company) || "—"}</p>
