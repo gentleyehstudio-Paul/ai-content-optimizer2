@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 
 const SERVICE_OPTIONS = [
   { value: "agents", label: "AI 代理人開發" },
@@ -17,9 +17,39 @@ const inputStyle = {
   color: "#f2f2ed",
 };
 
+const LINE_URL = "https://line.me/R/ti/p/%40kij2619w";
+
+type Status = "idle" | "sending" | "sent" | "error";
+
 export function ContactForm() {
   const [service, setService] = useState("");
-  const [submitted, setSubmitted] = useState(false);
+  const [status, setStatus] = useState<Status>("idle");
+
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (status === "sending") return;
+    setStatus("sending");
+    const fd = new FormData(e.currentTarget);
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          service,
+          name: fd.get("name"),
+          email: fd.get("email"),
+          company: fd.get("company"),
+          phone: fd.get("phone"),
+          message: fd.get("message"),
+          website: fd.get("website"), // honeypot
+        }),
+      });
+      // 只有伺服器明確回 2xx 才算成功
+      setStatus(res.ok ? "sent" : "error");
+    } catch {
+      setStatus("error");
+    }
+  }
 
   return (
     <>
@@ -60,7 +90,7 @@ export function ContactForm() {
         }}
       >
         <div className="max-w-[680px] mx-auto px-5">
-          {submitted ? (
+          {status === "sent" ? (
             <div className="text-center py-16">
               <p
                 className="font-bold"
@@ -75,10 +105,7 @@ export function ContactForm() {
           ) : (
             <form
               className="flex flex-col gap-5"
-              onSubmit={(e) => {
-                e.preventDefault();
-                setSubmitted(true);
-              }}
+              onSubmit={handleSubmit}
             >
               {/* Service type */}
               <div>
@@ -114,14 +141,20 @@ export function ContactForm() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <input
                   type="text"
+                  name="name"
                   required
+                  maxLength={100}
+                  disabled={status === "sending"}
                   placeholder="姓名 / 聯絡人"
                   className="px-4 py-3.5 rounded-sm text-[15px] outline-none placeholder:text-white/30"
                   style={inputStyle}
                 />
                 <input
                   type="email"
+                  name="email"
                   required
+                  maxLength={200}
+                  disabled={status === "sending"}
                   placeholder="Email"
                   className="px-4 py-3.5 rounded-sm text-[15px] outline-none placeholder:text-white/30"
                   style={inputStyle}
@@ -132,12 +165,18 @@ export function ContactForm() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <input
                   type="text"
+                  name="company"
+                  maxLength={150}
+                  disabled={status === "sending"}
                   placeholder="公司名稱（選填）"
                   className="px-4 py-3.5 rounded-sm text-[15px] outline-none placeholder:text-white/30"
                   style={inputStyle}
                 />
                 <input
                   type="tel"
+                  name="phone"
+                  maxLength={50}
+                  disabled={status === "sending"}
                   placeholder="電話（選填）"
                   className="px-4 py-3.5 rounded-sm text-[15px] outline-none placeholder:text-white/30"
                   style={inputStyle}
@@ -146,17 +185,61 @@ export function ContactForm() {
 
               {/* Description */}
               <textarea
+                name="message"
+                maxLength={4000}
+                disabled={status === "sending"}
                 placeholder="需求說明（想解決什麼問題？預算範圍？時程？）"
                 rows={4}
                 className="px-4 py-3.5 rounded-sm text-[15px] outline-none resize-none placeholder:text-white/30"
                 style={inputStyle}
               />
 
+              {/* Honeypot：真人看不到也不會填 */}
+              <input
+                type="text"
+                name="website"
+                tabIndex={-1}
+                autoComplete="off"
+                aria-hidden="true"
+                className="hidden"
+              />
+
+              {status === "error" && (
+                <div
+                  role="alert"
+                  className="text-[14px] leading-relaxed px-4 py-3 rounded-sm"
+                  style={{
+                    background: "#3a2623",
+                    border: "1px solid #a63328",
+                    color: "#f2f2ed",
+                  }}
+                >
+                  送出失敗，你的內容還在，請稍後再試一次。也可以改用{" "}
+                  <a
+                    href={LINE_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline"
+                  >
+                    LINE @kij2619w
+                  </a>{" "}
+                  或 Email{" "}
+                  <a
+                    href="mailto:gentleyehstudio@gmail.com"
+                    className="underline"
+                  >
+                    gentleyehstudio@gmail.com
+                  </a>
+                  。
+                </div>
+              )}
+
               <button
                 type="submit"
-                className="self-start px-8 py-3.5 bg-white text-ink font-semibold text-[14px] rounded-sm hover:bg-red hover:text-white transition-colors flex items-center gap-4"
+                disabled={status === "sending"}
+                className="self-start px-8 py-3.5 bg-white text-ink font-semibold text-[14px] rounded-sm hover:bg-red hover:text-white transition-colors flex items-center gap-4 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                送出詢價
+                {status === "sending" ? "送出中…" : "送出詢價"}
                 <span>↗</span>
               </button>
             </form>
@@ -177,17 +260,32 @@ export function ContactForm() {
             OTHER WAYS TO REACH US
           </p>
           <p className="text-text-secondary text-[14px] leading-relaxed">
-            也可以透過 LINE 官方帳號聯繫我們，掃描 QR Code 加好友
+            也可以透過 LINE 官方帳號（居葉設計）聯繫我們，點擊連結或掃描 QR Code 加好友
           </p>
-          <div className="mt-6 inline-block">
+          <p className="mt-4">
+            <a
+              href={LINE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[14px] font-semibold text-ink underline hover:text-red"
+            >
+              用 LINE 加好友（@kij2619w）
+            </a>
+          </p>
+          <a
+            href={LINE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-6 inline-block"
+          >
             <img
               src="/assets/line-qrcode.png"
-              alt="LINE QR Code"
+              alt="居葉設計 LINE 官方帳號 QR Code（@kij2619w）"
               width={140}
               height={140}
               className="rounded-lg"
             />
-          </div>
+          </a>
         </div>
       </section>
     </>

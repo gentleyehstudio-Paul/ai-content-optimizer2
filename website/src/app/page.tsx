@@ -1057,7 +1057,10 @@ export default function HomePage() {
             </a>
           </div>
 
-          <div
+          <a
+            href="https://line.me/R/ti/p/%40kij2619w"
+            target="_blank"
+            rel="noopener noreferrer"
             style={{
               display: "flex",
               alignItems: "center",
@@ -1070,7 +1073,7 @@ export default function HomePage() {
           >
             <Image
               src="/assets/line-qrcode.png"
-              alt="LINE QR Code"
+              alt="居葉設計 LINE 官方帳號 QR Code（@kij2619w）"
               width={120}
               height={120}
               style={{ borderRadius: 8, flex: "none" }}
@@ -1103,10 +1106,10 @@ export default function HomePage() {
                   color: "#a9b1a7",
                 }}
               >
-                掃描 QR Code 加好友
+                點擊或掃描 QR Code 加好友（居葉設計 @kij2619w）
               </p>
             </div>
-          </div>
+          </a>
         </div>
       </section>
     </>

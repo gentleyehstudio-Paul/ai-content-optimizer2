@@ -124,6 +124,16 @@ export function Footer() {
                   LinkedIn
                 </a>
               </li>
+              <li>
+                <a
+                  href="https://line.me/R/ti/p/%40kij2619w"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[14px] text-ink hover:text-red"
+                >
+                  LINE 官方帳號
+                </a>
+              </li>
             </ul>
           </div>
         </div>
