@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 const NAV_ITEMS = [
   { label: "Agents", href: "/agents" },
@@ -15,6 +16,9 @@ const NAV_ITEMS = [
 export function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  // /ai-team 的「預約諮詢」直接跳到本頁表單（#book），其他頁維持 /contact
+  const pathname = usePathname();
+  const ctaHref = pathname === "/ai-team" ? "#book" : "/contact";
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10);
@@ -65,7 +69,7 @@ export function Header() {
               </Link>
             ))}
             <Link
-              href="/contact"
+              href={ctaHref}
               className="ml-2 px-5 py-2 text-[14px] font-semibold rounded-full border border-ink text-ink hover:bg-red hover:text-white hover:border-red transition-all"
             >
               預約諮詢
@@ -104,7 +108,7 @@ export function Header() {
               </Link>
             ))}
             <Link
-              href="/contact"
+              href={ctaHref}
               onClick={() => setMenuOpen(false)}
               className="mt-4 text-center px-8 py-4 text-[16px] font-semibold rounded-full bg-ink text-white hover:bg-red transition-colors"
             >

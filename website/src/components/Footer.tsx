@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { YOUTUBE_CHANNEL_URL } from "@/lib/social";
 
 export function Footer() {
   return (
@@ -124,6 +125,18 @@ export function Footer() {
                   LinkedIn
                 </a>
               </li>
+              {YOUTUBE_CHANNEL_URL && (
+                <li>
+                  <a
+                    href={YOUTUBE_CHANNEL_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[14px] text-ink hover:text-red"
+                  >
+                    YouTube
+                  </a>
+                </li>
+              )}
               <li>
                 <a
                   href="https://line.me/R/ti/p/%40kij2619w"
