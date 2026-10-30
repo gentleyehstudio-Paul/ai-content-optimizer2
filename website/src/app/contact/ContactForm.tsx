@@ -242,14 +242,6 @@ export function ContactForm() {
                 {status === "sending" ? "送出中…" : "送出詢價"}
                 <span>↗</span>
               </button>
-
-              <p className="text-[12px] text-white/40 leading-relaxed">
-                送出即表示你同意我們依
-                <a href="/privacy-policy" className="underline">
-                  隱私權政策
-                </a>
-                處理你的資料。
-              </p>
             </form>
           )}
         </div>
