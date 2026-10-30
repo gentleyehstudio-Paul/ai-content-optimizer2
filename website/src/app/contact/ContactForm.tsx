@@ -35,6 +35,7 @@ export function ContactForm() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          source: "/contact",
           service,
           name: fd.get("name"),
           email: fd.get("email"),

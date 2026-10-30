@@ -1,5 +1,13 @@
 "use client";
 
+import { LeadForm } from "@/components/LeadForm";
+
+const FIELD_STYLE = {
+  background: "#252e26",
+  border: "1px solid #4a554b",
+  color: "#f2f2ed",
+};
+
 const COURSES = [
   {
     tag: "FOUNDATION",
@@ -365,74 +373,70 @@ export function TrainingContent() {
             告訴我們你的團隊規模與需求，三個工作天內回覆課程規劃與報價
           </p>
 
-          <form
+          <LeadForm
+            source="/training"
+            service="training"
+            successMessage="已收到，我們會在 1 個工作天內回覆。"
             className="mt-10 flex flex-col gap-5"
-            onSubmit={(e) => e.preventDefault()}
           >
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <input
-                type="text"
-                required
-                placeholder="聯絡人"
-                className="px-4 py-3.5 rounded-sm text-[15px] outline-none"
-                style={{
-                  background: "#252e26",
-                  border: "1px solid #4a554b",
-                  color: "#f2f2ed",
-                }}
-              />
-              <input
-                type="email"
-                required
-                placeholder="Email"
-                className="px-4 py-3.5 rounded-sm text-[15px] outline-none"
-                style={{
-                  background: "#252e26",
-                  border: "1px solid #4a554b",
-                  color: "#f2f2ed",
-                }}
-              />
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <input
-                type="text"
-                placeholder="公司名稱"
-                className="px-4 py-3.5 rounded-sm text-[15px] outline-none"
-                style={{
-                  background: "#252e26",
-                  border: "1px solid #4a554b",
-                  color: "#f2f2ed",
-                }}
-              />
-              <input
-                type="text"
-                placeholder="預計人數"
-                className="px-4 py-3.5 rounded-sm text-[15px] outline-none"
-                style={{
-                  background: "#252e26",
-                  border: "1px solid #4a554b",
-                  color: "#f2f2ed",
-                }}
-              />
-            </div>
-            <textarea
-              placeholder="需求說明（想上哪些主題、團隊背景等）"
-              rows={3}
-              className="px-4 py-3.5 rounded-sm text-[15px] outline-none resize-none"
-              style={{
-                background: "#252e26",
-                border: "1px solid #4a554b",
-                color: "#f2f2ed",
-              }}
-            />
-            <button
-              type="submit"
-              className="self-start px-8 py-3.5 bg-white text-ink font-semibold text-[14px] rounded-sm hover:bg-red hover:text-white transition-colors flex items-center gap-4"
-            >
-              送出諮詢
-              <span>↗</span>
-            </button>
-          </form>
+            {(sending) => (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <input
+                    type="text"
+                    name="name"
+                    required
+                    maxLength={100}
+                    placeholder="聯絡人"
+                    className="px-4 py-3.5 rounded-sm text-[15px] outline-none"
+                    style={FIELD_STYLE}
+                  />
+                  <input
+                    type="email"
+                    name="email"
+                    required
+                    maxLength={200}
+                    placeholder="Email"
+                    className="px-4 py-3.5 rounded-sm text-[15px] outline-none"
+                    style={FIELD_STYLE}
+                  />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <input
+                    type="text"
+                    name="company"
+                    maxLength={150}
+                    placeholder="公司名稱"
+                    className="px-4 py-3.5 rounded-sm text-[15px] outline-none"
+                    style={FIELD_STYLE}
+                  />
+                  <input
+                    type="text"
+                    name="headcount"
+                    maxLength={50}
+                    placeholder="預計人數"
+                    className="px-4 py-3.5 rounded-sm text-[15px] outline-none"
+                    style={FIELD_STYLE}
+                  />
+                </div>
+                <textarea
+                  name="message"
+                  maxLength={4000}
+                  placeholder="需求說明（想上哪些主題、團隊背景等）"
+                  rows={3}
+                  className="px-4 py-3.5 rounded-sm text-[15px] outline-none resize-none"
+                  style={FIELD_STYLE}
+                />
+                <button
+                  type="submit"
+                  className="self-start px-8 py-3.5 bg-white text-ink font-semibold text-[14px] rounded-sm hover:bg-red hover:text-white transition-colors flex items-center gap-4 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {sending ? "送出中…" : "送出諮詢"}
+                  <span>↗</span>
+                </button>
+              </>
+            )}
+          </LeadForm>
         </div>
       </section>
 

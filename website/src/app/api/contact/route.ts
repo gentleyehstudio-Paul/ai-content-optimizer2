@@ -9,7 +9,18 @@ const SERVICES: Record<string, string> = {
   printscale: "PrintScale-AI 試用",
   training: "企業 AI 培訓",
   brand: "品牌視覺設計",
+  consult: "免費諮詢",
   other: "其他",
+};
+
+// 來源頁面白名單：key 是前端送來的值，value 是信件主旨顯示的文字。
+// 沒送 source 時視為 /contact（向下相容）；不在白名單內則拒絕。
+const SOURCES: Record<string, string> = {
+  "/contact": "/contact",
+  "/training": "/training",
+  "/printscale": "/printscale",
+  "/agents": "/agents",
+  "/": "首頁",
 };
 
 const MAX_BODY_BYTES = 20_000;
@@ -59,10 +70,20 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  const name = oneLine(body.name, 100);
+  const sourceKey =
+    body.source === undefined || body.source === null || body.source === ""
+      ? "/contact"
+      : String(body.source);
+  const source = SOURCES[sourceKey];
+  if (!source) return err("invalid", 400);
+
   const email = oneLine(body.email, 200);
+  // 只有 Email 的表單（首頁、/printscale、/agents）沒有姓名欄，用 Email 代替
+  const name = oneLine(body.name, 100) || (sourceKey === "/contact" ? "" : email);
   const company = oneLine(body.company, 150);
   const phone = oneLine(body.phone, 50);
+  const headcount = oneLine(body.headcount, 50);
+  const imageLinks = String(body.imageLinks ?? "").trim().slice(0, 2000);
   const message = String(body.message ?? "").trim().slice(0, 4000);
   const service = SERVICES[String(body.service ?? "")] ?? "未選擇";
 
@@ -79,23 +100,27 @@ export async function POST(req: Request) {
     return err("server_config", 500);
   }
 
-  const subject = `【官網詢價】${service}｜${name}`;
+  const subject = `【官網詢價｜${source}】${service}｜${name}`;
   const text = [
+    `來源頁面：${sourceKey}`,
     `服務項目：${service}`,
     `姓名：${name}`,
     `Email：${email}`,
     `公司：${company || "—"}`,
     `電話：${phone || "—"}`,
+    ...(headcount ? [`預計人數：${headcount}`] : []),
+    ...(imageLinks ? ["", "圖片連結：", imageLinks] : []),
     "",
     "需求說明：",
     message || "—",
   ].join("\n");
-  const html = `<p><b>服務項目：</b>${esc(service)}</p>
+  const html = `<p><b>來源頁面：</b>${esc(sourceKey)}</p>
+<p><b>服務項目：</b>${esc(service)}</p>
 <p><b>姓名：</b>${esc(name)}</p>
 <p><b>Email：</b>${esc(email)}</p>
 <p><b>公司：</b>${esc(company) || "—"}</p>
 <p><b>電話：</b>${esc(phone) || "—"}</p>
-<p><b>需求說明：</b><br>${esc(message).replace(/\n/g, "<br>") || "—"}</p>`;
+${headcount ? `<p><b>預計人數：</b>${esc(headcount)}</p>\n` : ""}${imageLinks ? `<p><b>圖片連結：</b><br>${esc(imageLinks).replace(/\n/g, "<br>")}</p>\n` : ""}<p><b>需求說明：</b><br>${esc(message).replace(/\n/g, "<br>") || "—"}</p>`;
 
   try {
     const res = await fetch("https://api.resend.com/emails", {

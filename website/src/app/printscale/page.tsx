@@ -2,6 +2,7 @@
 
 import { BeforeAfter } from "@/components/BeforeAfter";
 import Image from "next/image";
+import { LeadForm } from "@/components/LeadForm";
 
 const SPECS = [
   { label: "解析度", value: "300 dpi" },
@@ -33,7 +34,7 @@ const PRICING = [
     tag: "FREE TRIAL",
     name: "免費試用",
     price: "3 張",
-    desc: "留下 Email 即可開始",
+    desc: "留下 Email 申請試用",
     featured: true,
   },
   {
@@ -285,28 +286,40 @@ export default function PrintScalePage() {
           >
             免費試用 3 張
           </h2>
-          <form
+          <p className="text-white/50 text-[14px] mt-3 leading-relaxed">
+            留下 Email，我們會在 1 個工作天內回覆試用方式
+          </p>
+          <LeadForm
+            source="/printscale"
+            service="printscale"
+            successMessage="已收到，我們會在 1 個工作天內回覆。"
             className="mt-8 flex flex-col sm:flex-row gap-3 max-w-md mx-auto"
-            onSubmit={(e) => e.preventDefault()}
           >
-            <input
-              type="email"
-              placeholder="Email"
-              className="flex-1 px-5 py-3 rounded-sm text-[15px] outline-none"
-              style={{
-                background: "#252e26",
-                border: "1px solid #4a554b",
-                color: "#f2f2ed",
-              }}
-            />
-            <button
-              type="submit"
-              className="px-6 py-3 bg-white text-ink text-[14px] font-semibold rounded-sm hover:bg-red hover:text-white transition-colors flex items-center gap-3 justify-center"
-            >
-              開始試用
-              <span>↗</span>
-            </button>
-          </form>
+            {(sending) => (
+              <>
+                <input
+                  type="email"
+                  name="email"
+                  required
+                  maxLength={200}
+                  placeholder="Email"
+                  className="flex-1 px-5 py-3 rounded-sm text-[15px] outline-none"
+                  style={{
+                    background: "#252e26",
+                    border: "1px solid #4a554b",
+                    color: "#f2f2ed",
+                  }}
+                />
+                <button
+                  type="submit"
+                  className="px-6 py-3 bg-white text-ink text-[14px] font-semibold rounded-sm hover:bg-red hover:text-white transition-colors flex items-center gap-3 justify-center disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {sending ? "送出中…" : "申請試用"}
+                  <span>↗</span>
+                </button>
+              </>
+            )}
+          </LeadForm>
         </div>
       </section>
     </>
