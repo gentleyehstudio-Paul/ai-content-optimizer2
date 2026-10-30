@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { HeroCanvas } from "@/components/HeroCanvas";
 import { BeforeAfter } from "@/components/BeforeAfter";
+import { LeadForm } from "@/components/LeadForm";
 
 const PROCESS_STEPS = [
   {
@@ -284,7 +285,7 @@ export default function HomePage() {
                 }}
               >
                 <a
-                  href="#results"
+                  href="/agents#diagnose"
                   style={{
                     display: "inline-flex",
                     alignItems: "center",
@@ -298,7 +299,7 @@ export default function HomePage() {
                     fontWeight: 600,
                   }}
                 >
-                  上傳你的 AI 圖，免費診斷
+                  貼連結或 LINE 傳圖
                   <span aria-hidden>↗</span>
                 </a>
                 <a
@@ -930,9 +931,9 @@ export default function HomePage() {
           }}
         >
           <div>
-            <Label>FREE CHECKLIST</Label>
+            <Label>FREE CONSULTATION</Label>
             <h2 style={{ ...H2, fontSize: "clamp(28px,3.6vw,48px)" }}>
-              免費提供「AI 工作流顧問諮詢」
+              預約免費諮詢
             </h2>
             <p
               style={{
@@ -943,57 +944,70 @@ export default function HomePage() {
                 color: "#51594f",
               }}
             >
-              交出去之前，先用 12 個問題自己檢查一遍：Logo、光線、質感、文字
+              留下 Email，我們會在 1 個工作天內與你聯繫，安排 AI 工作流諮詢時間
             </p>
           </div>
 
-          <form onSubmit={(e) => e.preventDefault()}>
-            <label
-              htmlFor="resource-email"
-              style={{
-                display: "block",
-                fontSize: 11,
-                letterSpacing: ".16em",
-                fontWeight: 600,
-                color: "#4e554e",
-                marginBottom: 8,
-              }}
-            >
-              EMAIL
-            </label>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-              <input
-                id="resource-email"
-                type="email"
-                placeholder="you@company.com"
-                style={{
-                  flex: "1 1 200px",
-                  minHeight: 52,
-                  padding: "0 16px",
-                  border: "1px solid #bec3b8",
-                  borderRadius: 3,
-                  background: "#fff",
-                  fontSize: 15,
-                  outline: "none",
-                }}
-              />
-              <button
-                type="submit"
-                style={{
-                  minHeight: 52,
-                  padding: "0 20px",
-                  border: "1px solid #191a18",
-                  borderRadius: 3,
-                  background: "transparent",
-                  fontSize: 14,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                寄給我 →
-              </button>
-            </div>
-          </form>
+          <LeadForm
+            source="/"
+            service="consult"
+            theme="light"
+            successMessage="已收到，我們會在 1 個工作天內與你聯繫。"
+          >
+            {(sending) => (
+              <>
+                <label
+                  htmlFor="resource-email"
+                  style={{
+                    display: "block",
+                    fontSize: 11,
+                    letterSpacing: ".16em",
+                    fontWeight: 600,
+                    color: "#4e554e",
+                    marginBottom: 8,
+                  }}
+                >
+                  EMAIL
+                </label>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+                  <input
+                    id="resource-email"
+                    type="email"
+                    name="email"
+                    required
+                    maxLength={200}
+                    placeholder="you@company.com"
+                    style={{
+                      flex: "1 1 200px",
+                      minHeight: 52,
+                      padding: "0 16px",
+                      border: "1px solid #bec3b8",
+                      borderRadius: 3,
+                      background: "#fff",
+                      fontSize: 15,
+                      outline: "none",
+                    }}
+                  />
+                  <button
+                    type="submit"
+                    style={{
+                      minHeight: 52,
+                      padding: "0 20px",
+                      border: "1px solid #191a18",
+                      borderRadius: 3,
+                      background: "transparent",
+                      fontSize: 14,
+                      fontWeight: 600,
+                      cursor: sending ? "not-allowed" : "pointer",
+                      opacity: sending ? 0.6 : 1,
+                    }}
+                  >
+                    {sending ? "送出中…" : "預約諮詢 →"}
+                  </button>
+                </div>
+              </>
+            )}
+          </LeadForm>
         </div>
       </section>
 

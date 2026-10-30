@@ -86,14 +86,6 @@ export function Footer() {
                   聯絡我們
                 </Link>
               </li>
-              <li>
-                <Link
-                  href="/privacy-policy"
-                  className="text-[14px] text-ink hover:text-red"
-                >
-                  隱私權政策
-                </Link>
-              </li>
             </ul>
           </div>
 

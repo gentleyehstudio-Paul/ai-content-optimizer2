@@ -119,7 +119,7 @@ export default function ResourcesPage() {
             想了解更多？
           </h2>
           <p className="text-white/50 text-[14px] mt-3 leading-relaxed max-w-md mx-auto">
-            從免費診斷開始——上傳你的 AI 圖，設計師親自看圖回覆
+            從免費診斷開始——貼上圖片連結或用 LINE 傳圖，設計師親自看圖回覆
           </p>
           <a
             href="/contact"

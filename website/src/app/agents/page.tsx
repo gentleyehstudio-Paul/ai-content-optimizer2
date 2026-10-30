@@ -4,6 +4,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { BeforeAfter } from "@/components/BeforeAfter";
 import { AgentsHeroCanvas } from "@/components/AgentsHeroCanvas";
+import { LeadForm, LINE_URL } from "@/components/LeadForm";
+
+const FIELD_STYLE = {
+  background: "#252e26",
+  border: "1px solid #4a554b",
+  color: "#f2f2ed",
+};
 
 const SCENARIOS = [
   { num: "01", text: "Logo 的字母被 AI 改寫、拉長、少一筆" },
@@ -114,7 +121,7 @@ export default function AgentsPage() {
             className="inline-flex items-center gap-2 mt-8 px-8 py-3.5 bg-ink font-semibold text-[15px] rounded-full hover:bg-red transition-colors"
             style={{ color: "#ffffff" }}
           >
-            上傳你的 AI 圖，免費診斷
+            貼連結或 LINE 傳圖，免費診斷
           </a>
         </div>
       </section>
@@ -336,67 +343,83 @@ export default function AgentsPage() {
             className="font-bold"
             style={{ fontSize: "clamp(28px, 3.6vw, 48px)" }}
           >
-            上傳你的 AI 圖，免費診斷
+            貼上圖片連結或用 LINE 傳圖，免費診斷
           </h2>
           <p className="text-white/50 text-[14px] mt-3 leading-relaxed max-w-lg">
-            設計師親自看圖，三個工作天內回覆：哪裡有 AI 味、Logo
-            能否修正、建議的落地方式
+            設計師親自看圖：哪裡有 AI 味、Logo 能否修正、建議的落地方式。1
+            個工作天內先回覆，再提供診斷結果
           </p>
 
-          <form
+          <LeadForm
+            source="/agents"
+            service="diagnose"
+            successMessage="已收到，我們會在 1 個工作天內先回覆，再提供診斷結果。"
             className="mt-10 flex flex-col gap-5"
-            onSubmit={(e) => e.preventDefault()}
           >
-            <div
-              className="border border-dashed rounded-[14px] p-8 text-center cursor-pointer hover:border-white/40 transition-colors"
-              style={{ borderColor: "#5a665b" }}
-            >
-              <p className="text-white/50 text-[14px]">拖放或點擊上傳圖片</p>
-            </div>
+            {(sending) => (
+              <>
+                <div>
+                  <textarea
+                    name="imageLinks"
+                    maxLength={2000}
+                    rows={2}
+                    placeholder="圖片連結（選填，例如 Google Drive、Dropbox 分享連結）"
+                    className="w-full px-4 py-3.5 rounded-sm text-[15px] outline-none resize-none"
+                    style={FIELD_STYLE}
+                  />
+                  <p className="text-white/50 text-[13px] mt-2 leading-relaxed">
+                    沒有連結也沒關係，可以直接用{" "}
+                    <a
+                      href={LINE_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline hover:text-white"
+                    >
+                      LINE @kij2619w
+                    </a>{" "}
+                    傳圖給我們。
+                  </p>
+                </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <input
-                type="email"
-                required
-                placeholder="Email"
-                className="px-4 py-3.5 rounded-sm text-[15px] outline-none"
-                style={{
-                  background: "#252e26",
-                  border: "1px solid #4a554b",
-                  color: "#f2f2ed",
-                }}
-              />
-              <input
-                type="text"
-                placeholder="公司"
-                className="px-4 py-3.5 rounded-sm text-[15px] outline-none"
-                style={{
-                  background: "#252e26",
-                  border: "1px solid #4a554b",
-                  color: "#f2f2ed",
-                }}
-              />
-            </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <input
+                    type="email"
+                    name="email"
+                    required
+                    maxLength={200}
+                    placeholder="Email"
+                    className="px-4 py-3.5 rounded-sm text-[15px] outline-none"
+                    style={FIELD_STYLE}
+                  />
+                  <input
+                    type="text"
+                    name="company"
+                    maxLength={150}
+                    placeholder="公司"
+                    className="px-4 py-3.5 rounded-sm text-[15px] outline-none"
+                    style={FIELD_STYLE}
+                  />
+                </div>
 
-            <textarea
-              placeholder="需求說明"
-              rows={3}
-              className="px-4 py-3.5 rounded-sm text-[15px] outline-none resize-none"
-              style={{
-                background: "#252e26",
-                border: "1px solid #4a554b",
-                color: "#f2f2ed",
-              }}
-            />
+                <textarea
+                  name="message"
+                  maxLength={4000}
+                  placeholder="需求說明"
+                  rows={3}
+                  className="px-4 py-3.5 rounded-sm text-[15px] outline-none resize-none"
+                  style={FIELD_STYLE}
+                />
 
-            <button
-              type="submit"
-              className="self-start px-8 py-3.5 bg-white text-ink font-semibold text-[14px] rounded-sm hover:bg-red hover:text-white transition-colors flex items-center gap-4"
-            >
-              送出免費診斷
-              <span>↗</span>
-            </button>
-          </form>
+                <button
+                  type="submit"
+                  className="self-start px-8 py-3.5 bg-white text-ink font-semibold text-[14px] rounded-sm hover:bg-red hover:text-white transition-colors flex items-center gap-4 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {sending ? "送出中…" : "送出免費診斷"}
+                  <span>↗</span>
+                </button>
+              </>
+            )}
+          </LeadForm>
         </div>
       </section>
     </>

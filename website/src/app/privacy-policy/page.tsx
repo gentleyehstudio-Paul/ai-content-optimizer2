@@ -6,8 +6,9 @@ export const metadata: Metadata = {
   description:
     "說明 gentleyehdesign.com 如何蒐集、處理與利用你的個人資料，包含聯絡表單、Google Analytics 4、LINE 官方帳號與 Email。",
   alternates: { canonical: "/privacy-policy" },
-  // 內容仍有【待 Gentle 確認】項目；確認完成、移除標記後，請一併拿掉 noindex 並加入 sitemap。
-  robots: { index: false, follow: true },
+  // 暫不公開（2026-10-30 Gentle 決定先拿掉隱私頁連結）：不從任何頁面連入、不列入 sitemap。
+  // 內容仍有【待 Gentle 確認】項目；確認完成、移除標記後，再拿掉 noindex、加回連結與 sitemap。
+  robots: { index: false, follow: false },
 };
 
 const LINE_URL = "https://line.me/R/ti/p/%40kij2619w";

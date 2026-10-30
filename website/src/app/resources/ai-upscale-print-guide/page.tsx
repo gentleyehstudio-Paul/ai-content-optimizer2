@@ -104,7 +104,7 @@ export default function Page() {
       </ol>
 
       <blockquote>
-        不確定你的 AI 圖能不能印？免費試用 PrintScale-AI 三張，或上傳讓設計師診斷。
+        不確定你的 AI 圖能不能印？免費試用 PrintScale-AI 三張，或貼上圖片連結、用 LINE 傳圖讓設計師免費診斷。
       </blockquote>
 
       <hr />

@@ -5,7 +5,6 @@ import { useState, type FormEvent } from "react";
 const PLAN_OPTIONS = [
   { value: "personal", label: "個人版" },
   { value: "business", label: "企業版" },
-  { value: "manufacturing", label: "製造業（待 Gentle 確認）" },
 ];
 
 // 廣告參數：只讀網址上的這些鍵，連同表單一起寄出（不送進任何追蹤事件）
@@ -62,7 +61,7 @@ export function AiTeamForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           service: "ai-team",
-          source: "ai-team",
+          source: "/ai-team",
           plan,
           name: fd.get("name"),
           email: fd.get("email"),
@@ -201,14 +200,6 @@ export function AiTeamForm() {
         {status === "sending" ? "送出中…" : "預約免費 30 分鐘 AI 團隊診斷"}
         <span>↗</span>
       </button>
-
-      <p className="text-[12px] text-white/40 leading-relaxed">
-        送出即表示你同意我們依
-        <a href="/privacy-policy" className="underline">
-          隱私權政策
-        </a>
-        處理你的資料。
-      </p>
     </form>
   );
 }
