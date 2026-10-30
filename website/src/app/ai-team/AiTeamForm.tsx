@@ -85,7 +85,7 @@ export function AiTeamForm() {
           已收到你的預約
         </p>
         <p className="text-white/50 text-[15px] mt-4 leading-relaxed">
-          我們會用 Email 和你約 30 分鐘的時間。
+          我們會在 1 個工作天內先回覆，再用 Email 和你約 30 分鐘的時間。
         </p>
       </div>
     );
