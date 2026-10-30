@@ -285,7 +285,7 @@ export default function HomePage() {
                 }}
               >
                 <a
-                  href="#results"
+                  href="/agents#diagnose"
                   style={{
                     display: "inline-flex",
                     alignItems: "center",
@@ -299,7 +299,7 @@ export default function HomePage() {
                     fontWeight: 600,
                   }}
                 >
-                  貼上圖片連結或用 LINE 傳圖，免費診斷
+                  貼連結或 LINE 傳圖
                   <span aria-hidden>↗</span>
                 </a>
                 <a

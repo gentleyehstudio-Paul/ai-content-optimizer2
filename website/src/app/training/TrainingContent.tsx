@@ -370,7 +370,7 @@ export function TrainingContent() {
             預約企業培訓
           </h2>
           <p className="text-white/50 text-[14px] mt-3 leading-relaxed max-w-lg">
-            告訴我們你的團隊規模與需求，1 個工作天內回覆課程規劃與報價
+            告訴我們你的團隊規模與需求，我們會在 1 個工作天內先回覆，再提供課程規劃與報價
           </p>
 
           <LeadForm

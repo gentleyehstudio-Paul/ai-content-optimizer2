@@ -287,7 +287,7 @@ export default function PrintScalePage() {
             免費試用 3 張
           </h2>
           <p className="text-white/50 text-[14px] mt-3 leading-relaxed">
-            留下 Email，我們會在 1 個工作天內回覆試用方式
+            留下 Email，我們會在 1 個工作天內先回覆，再與你確認試用方式
           </p>
           <LeadForm
             source="/printscale"

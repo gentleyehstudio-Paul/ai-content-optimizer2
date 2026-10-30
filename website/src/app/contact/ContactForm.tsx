@@ -77,7 +77,7 @@ export function ContactForm() {
             聯絡我們
           </h1>
           <p className="text-text-secondary text-[16px] mt-4 max-w-lg leading-relaxed">
-            告訴我們你的需求，1 個工作天內回覆方案與報價
+            告訴我們你的需求，我們會在 1 個工作天內先回覆，再與你討論方案與報價
           </p>
         </div>
       </section>
@@ -100,7 +100,7 @@ export function ContactForm() {
                 感謝您的詢問
               </p>
               <p className="text-white/50 text-[15px] mt-4 leading-relaxed">
-                我們已收到你的需求，將於 1 個工作天內回覆。
+                我們已收到你的需求，會在 1 個工作天內先回覆你。
               </p>
             </div>
           ) : (
