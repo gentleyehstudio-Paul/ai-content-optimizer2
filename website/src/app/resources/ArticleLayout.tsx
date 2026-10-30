@@ -63,7 +63,7 @@ export function ArticleLayout({
               需要協助落地？
             </p>
             <p className="text-[14px] text-text-secondary mt-1">
-              上傳你的 AI 圖，設計師免費診斷
+              貼上圖片連結或用 LINE 傳圖，設計師免費診斷
             </p>
           </div>
           <a

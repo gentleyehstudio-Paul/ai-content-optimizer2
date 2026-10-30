@@ -299,7 +299,7 @@ export default function HomePage() {
                     fontWeight: 600,
                   }}
                 >
-                  上傳你的 AI 圖，免費診斷
+                  貼上圖片連結或用 LINE 傳圖，免費診斷
                   <span aria-hidden>↗</span>
                 </a>
                 <a

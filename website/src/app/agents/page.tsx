@@ -121,7 +121,7 @@ export default function AgentsPage() {
             className="inline-flex items-center gap-2 mt-8 px-8 py-3.5 bg-ink font-semibold text-[15px] rounded-full hover:bg-red transition-colors"
             style={{ color: "#ffffff" }}
           >
-            上傳你的 AI 圖，免費診斷
+            貼上圖片連結或用 LINE 傳圖，免費診斷
           </a>
         </div>
       </section>
@@ -343,17 +343,17 @@ export default function AgentsPage() {
             className="font-bold"
             style={{ fontSize: "clamp(28px, 3.6vw, 48px)" }}
           >
-            上傳你的 AI 圖，免費診斷
+            貼上圖片連結或用 LINE 傳圖，免費診斷
           </h2>
           <p className="text-white/50 text-[14px] mt-3 leading-relaxed max-w-lg">
-            設計師親自看圖，三個工作天內回覆：哪裡有 AI 味、Logo
+            設計師親自看圖，1 個工作天內回覆：哪裡有 AI 味、Logo
             能否修正、建議的落地方式
           </p>
 
           <LeadForm
             source="/agents"
             service="diagnose"
-            successMessage="已收到，設計師會在三個工作天內回覆診斷結果。"
+            successMessage="已收到，設計師會在 1 個工作天內回覆診斷結果。"
             className="mt-10 flex flex-col gap-5"
           >
             {(sending) => (
