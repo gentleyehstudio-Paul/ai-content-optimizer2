@@ -2,14 +2,13 @@ import type { Metadata } from "next";
 import type { CSSProperties, ReactNode } from "react";
 import { AiTeamForm } from "./AiTeamForm";
 
-// 尚未公開：維持 noindex、不放 sitemap、不放在導覽列或頁尾。
+// 2026-10-30 12:46 Gentle 核准開放收錄：移除 noindex、加入 sitemap（仍不放在導覽列或頁尾）。
 // 內容依 2026-10-30 定案（Gentle／Tesla），合併前由 Gentle 再看一次。
 export const metadata: Metadata = {
   title: "AI 團隊建置｜對外訊息都先經你同意｜居葉設計",
   description:
     "為一人公司與中小企業建一支 AI 小團隊：角色分工清楚、每天回報進度，任何對外訊息都先經你同意才送出。預約免費 30 分鐘 AI 團隊診斷。",
   alternates: { canonical: "https://www.gentleyehdesign.com/ai-team" },
-  robots: { index: false, follow: false },
 };
 
 const LINE_URL = "https://line.me/R/ti/p/%40kij2619w";
