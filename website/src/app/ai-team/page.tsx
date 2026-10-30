@@ -1,15 +1,46 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import type { CSSProperties, ReactNode } from "react";
 import { AiTeamForm } from "./AiTeamForm";
+import { StickyBookCta } from "./StickyBookCta";
+import { LineClickTracker } from "./LineClickTracker";
+import { YouTubeFacade } from "./YouTubeFacade";
+import {
+  AI_TEAM_VIDEO,
+  AI_TEAM_VIDEO_UPLOAD_DATE,
+  AI_TEAM_YOUTUBE_ID,
+  aiTeamVideoEnabled,
+  aiTeamVideoThumb,
+} from "./video";
 
 // 2026-10-30 12:46 Gentle 核准開放收錄：移除 noindex、加入 sitemap（仍不放在導覽列或頁尾）。
 // 內容依 2026-10-30 定案（Gentle／Tesla），合併前由 Gentle 再看一次。
+const PAGE_URL = "https://www.gentleyehdesign.com/ai-team";
+const DESCRIPTION =
+  "為一人公司與中小企業建一支 AI 小團隊：角色分工清楚、每天回報進度，任何對外訊息都先經你同意才送出。預約免費 30 分鐘 AI 團隊診斷。";
+const SHARE_TITLE = "一人公司，也能有一支 AI 小團隊｜居葉設計";
+
+// 分享圖：同資料夾的 opengraph-image.png／twitter-image.png（1200x630，取自短影音結尾畫面）
 export const metadata: Metadata = {
   title: "AI 團隊建置｜對外訊息都先經你同意｜居葉設計",
-  description:
-    "為一人公司與中小企業建一支 AI 小團隊：角色分工清楚、每天回報進度，任何對外訊息都先經你同意才送出。預約免費 30 分鐘 AI 團隊診斷。",
-  alternates: { canonical: "https://www.gentleyehdesign.com/ai-team" },
+  description: DESCRIPTION,
+  alternates: { canonical: PAGE_URL },
+  openGraph: {
+    title: SHARE_TITLE,
+    description: DESCRIPTION,
+    url: PAGE_URL,
+    siteName: "Gentleyehstudio",
+    locale: "zh_TW",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SHARE_TITLE,
+    description: DESCRIPTION,
+  },
 };
+
+// 讓手機底部固定按鈕可以避開 iPhone 底部安全區
+export const viewport: Viewport = { viewportFit: "cover" };
 
 const LINE_URL = "https://line.me/R/ti/p/%40kij2619w";
 const MAILTO =
@@ -171,7 +202,22 @@ const FAQ_LD = {
   })),
 };
 
+function videoLd(id: string) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "VideoObject",
+    name: AI_TEAM_VIDEO.name,
+    description: AI_TEAM_VIDEO.description,
+    thumbnailUrl: [aiTeamVideoThumb(id)],
+    uploadDate: AI_TEAM_VIDEO_UPLOAD_DATE,
+    duration: AI_TEAM_VIDEO.duration,
+    embedUrl: `https://www.youtube.com/embed/${id}`,
+    publisher: { "@id": "https://www.gentleyehdesign.com/#organization" },
+  };
+}
+
 export default function AiTeamPage() {
+  const videoId = aiTeamVideoEnabled() ? AI_TEAM_YOUTUBE_ID : null;
   return (
     <>
       {/* ── 區塊 1：首屏 ── */}
@@ -184,6 +230,12 @@ export default function AiTeamPage() {
       >
         <div className="max-w-[1080px] mx-auto px-5">
           <Eyebrow>AI TEAM ・ 居葉設計</Eyebrow>
+          <p
+            className="text-ink font-bold mb-5"
+            style={{ fontSize: "clamp(17px,2vw,24px)", letterSpacing: "-.01em" }}
+          >
+            一人公司，也能有一支 AI 小團隊
+          </p>
           <h1
             className="font-black text-ink"
             style={{
@@ -201,7 +253,7 @@ export default function AiTeamPage() {
             <p className="text-text-secondary text-[15px] leading-[1.9] max-w-xl">
               為一人公司、小老闆與中小企業建一支 AI 小團隊：角色分工清楚、隨時待命、每天回報進度。
             </p>
-            <div className="flex flex-col gap-4 items-start">
+            <div id="hero-cta" className="flex flex-col gap-4 items-start">
               <a
                 href="#book"
                 className="px-8 py-3.5 bg-ink text-white font-semibold text-[14px] rounded-sm hover:bg-red hover:!text-white transition-colors flex items-center gap-4"
@@ -263,6 +315,20 @@ export default function AiTeamPage() {
           <p className="mt-6 text-[15px] leading-[1.9] text-text-secondary max-w-2xl">
             這不是概念圖。居葉設計自己的工作，就是由一支 AI 團隊分工擬稿、由人確認後才送出。
           </p>
+
+          {videoId && (
+            <div className="mt-12">
+              <YouTubeFacade
+                id={videoId}
+                title={AI_TEAM_VIDEO.name}
+                poster={aiTeamVideoThumb(videoId)}
+              />
+              <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{ __html: JSON.stringify(videoLd(videoId)) }}
+              />
+            </div>
+          )}
 
           <div className="mt-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 border-t border-l border-hairline">
             {ROLES.map(([role, duty], i) => (
@@ -603,6 +669,9 @@ export default function AiTeamPage() {
           <p>本頁不顯示任何客戶名稱、案例或推薦語。</p>
         </div>
       </section>
+
+      <StickyBookCta />
+      <LineClickTracker />
     </>
   );
 }
