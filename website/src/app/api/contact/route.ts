@@ -10,6 +10,7 @@ const SERVICES: Record<string, string> = {
   training: "企業 AI 培訓",
   brand: "品牌視覺設計",
   consult: "免費諮詢",
+  "ai-team": "AI 團隊診斷",
   other: "其他",
 };
 
@@ -20,7 +21,14 @@ const SOURCES: Record<string, string> = {
   "/training": "/training",
   "/printscale": "/printscale",
   "/agents": "/agents",
+  "/ai-team": "/ai-team",
   "/": "首頁",
+};
+
+// /ai-team 頁的版本選項（白名單）
+const PLANS: Record<string, string> = {
+  personal: "個人版",
+  business: "企業版",
 };
 
 const MAX_BODY_BYTES = 20_000;
@@ -85,6 +93,14 @@ export async function POST(req: Request) {
   const headcount = oneLine(body.headcount, 50);
   const imageLinks = String(body.imageLinks ?? "").trim().slice(0, 2000);
   const message = String(body.message ?? "").trim().slice(0, 4000);
+  // 以下為 /ai-team 頁使用的選填欄位，其他頁不送就不會出現在信裡
+  const plan = PLANS[String(body.plan ?? "")] ?? "";
+  const timeslot = oneLine(body.timeslot, 200);
+  const attribution = oneLine(body.attribution, 600);
+  const extra: [string, string][] = [];
+  if (plan) extra.push(["版本", plan]);
+  if (timeslot) extra.push(["方便的時段", timeslot]);
+  if (attribution) extra.push(["廣告參數", attribution]);
   const service = SERVICES[String(body.service ?? "")] ?? "未選擇";
 
   if (!name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -109,6 +125,7 @@ export async function POST(req: Request) {
     `公司：${company || "—"}`,
     `電話：${phone || "—"}`,
     ...(headcount ? [`預計人數：${headcount}`] : []),
+    ...extra.map(([k, v]) => `${k}：${v}`),
     ...(imageLinks ? ["", "圖片連結：", imageLinks] : []),
     "",
     "需求說明：",
@@ -120,7 +137,7 @@ export async function POST(req: Request) {
 <p><b>Email：</b>${esc(email)}</p>
 <p><b>公司：</b>${esc(company) || "—"}</p>
 <p><b>電話：</b>${esc(phone) || "—"}</p>
-${headcount ? `<p><b>預計人數：</b>${esc(headcount)}</p>\n` : ""}${imageLinks ? `<p><b>圖片連結：</b><br>${esc(imageLinks).replace(/\n/g, "<br>")}</p>\n` : ""}<p><b>需求說明：</b><br>${esc(message).replace(/\n/g, "<br>") || "—"}</p>`;
+${headcount ? `<p><b>預計人數：</b>${esc(headcount)}</p>\n` : ""}${extra.map(([k, v]) => `<p><b>${esc(k)}：</b>${esc(v)}</p>\n`).join("")}${imageLinks ? `<p><b>圖片連結：</b><br>${esc(imageLinks).replace(/\n/g, "<br>")}</p>\n` : ""}<p><b>需求說明：</b><br>${esc(message).replace(/\n/g, "<br>") || "—"}</p>`;
 
   try {
     const res = await fetch("https://api.resend.com/emails", {
