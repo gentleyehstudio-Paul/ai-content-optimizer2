@@ -95,7 +95,7 @@ export default function Page() {
       <hr />
 
       <p>
-        需要更進一步的協助？Gentleyehstudio 提供免費診斷——上傳你的 AI 圖，設計師會告訴你授權狀態與建議的處理方式。
+        需要更進一步的協助？Gentleyehstudio 提供免費診斷——貼上圖片連結或用 LINE 傳圖，設計師會告訴你授權狀態與建議的處理方式。
       </p>
 
       <script
