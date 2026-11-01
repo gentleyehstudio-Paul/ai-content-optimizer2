@@ -4,6 +4,7 @@ import { AiTeamForm } from "./AiTeamForm";
 import { StickyBookCta } from "./StickyBookCta";
 import { LineClickTracker } from "./LineClickTracker";
 import { YouTubeFacade } from "./YouTubeFacade";
+import { HeroA3 } from "./HeroA3";
 import {
   AI_TEAM_VIDEO,
   AI_TEAM_VIDEO_UPLOAD_DATE,
@@ -220,40 +221,16 @@ export default function AiTeamPage() {
   const videoId = aiTeamVideoEnabled() ? AI_TEAM_YOUTUBE_ID : null;
   return (
     <>
-      {/* ── 區塊 1：首屏 ── */}
-      <section
-        className="bg-paper overflow-hidden"
-        style={{
-          paddingTop: "clamp(120px,14vw,200px)",
-          paddingBottom: "clamp(64px,8vw,112px)",
-        }}
-      >
+      {/* ── 區塊 1：首屏（A3 Lulu 藍色版，見 HeroA3.tsx／heroA3.config.ts） ── */}
+      <HeroA3 />
+      <section className="bg-paper" style={{ padding: "clamp(36px,5vw,72px) 0 clamp(56px,7vw,96px)" }}>
         <div className="max-w-[1080px] mx-auto px-5">
-          <Eyebrow>AI TEAM ・ 居葉設計</Eyebrow>
-          <p
-            className="text-ink font-bold mb-5"
-            style={{ fontSize: "clamp(17px,2vw,24px)", letterSpacing: "-.01em" }}
-          >
-            一人公司，也能有一支 AI 小團隊
-          </p>
-          <h1
-            className="font-black text-ink"
-            style={{
-              fontSize: "clamp(44px,8.6vw,128px)",
-              lineHeight: 1.02,
-              letterSpacing: "-.04em",
-              fontWeight: 900,
-            }}
-          >
-            任何對外訊息，
-            <br />
-            都先經你同意。
-          </h1>
-          <div className="mt-10 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-8 items-end">
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-8 items-end">
             <p className="text-text-secondary text-[15px] leading-[1.9] max-w-xl">
               為一人公司、小老闆與中小企業建一支 AI 小團隊：角色分工清楚、隨時待命、每天回報進度。
             </p>
-            <div id="hero-cta" className="flex flex-col gap-4 items-start">
+            {/* id="hero-cta"：StickyBookCta 靠它判斷手機底部按鈕何時出現，不要改名 */}
+            <div id="hero-cta" className="order-first md:order-none flex flex-col gap-4 items-start">
               <a
                 href="#book"
                 className="px-8 py-3.5 bg-ink text-white font-semibold text-[14px] rounded-sm hover:bg-red hover:!text-white transition-colors flex items-center gap-4"

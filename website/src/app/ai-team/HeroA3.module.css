@@ -1,0 +1,337 @@
+/* /ai-team 首屏 A3。位置與字級依 handoff-A3 §3：百分比相對畫布、cqw = 畫布寬 1%。
+   手機（< 768px）對 1080×1920 構圖，桌機（≥ 768px）對 2560×1200 構圖。
+   只動 transform／opacity；不加陰影、外框、描邊。 */
+
+.hero {
+  --hero-blue: #1b3fd6;
+  --lime: #d4ff3a;
+  --cjk: "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+  position: relative;
+  overflow: hidden;
+  background: var(--hero-blue);
+  color: #fff;
+  container-type: inline-size;
+}
+
+/* 桌機窄寬（768–2000px）時，固定 Header（68px）會壓到卡片 01 與徽章：
+   畫布上方補一條同色藍帶，寬度越大越窄，約 2057px 以上為 0。 */
+.headerSafe {
+  padding-top: 0;
+}
+
+.canvas {
+  position: relative;
+  width: 100%;
+  max-width: 2560px; /* 超過 2560px 置中，兩側由 .hero 的 #1B3FD6 補色 */
+  margin-inline: auto;
+  aspect-ratio: 9 / 16;
+  container-type: inline-size;
+  /* 手機卡片內部單位：卡寬 26.8cqw 對應設計 340px */
+  --u: calc(26.8cqw / 340);
+}
+
+.layer,
+.layer img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.layer img {
+  object-fit: cover;
+}
+.layer[data-layer="bg"],
+.layer[data-layer="art"] {
+  z-index: 0;
+}
+.layer[data-layer="fg"] {
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* ── 文字 ── */
+.eyebrow {
+  display: none; /* 手機：品牌名已在 Header，巨字上方沒有空間 */
+}
+
+.display {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  margin: 0;
+  font-family: var(--font-ai-hero), var(--cjk);
+  font-weight: 900;
+  color: #fff;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.line1,
+.line2 {
+  position: absolute;
+  display: block;
+}
+/* top 減約 0.07–0.08em：把 CSS 行框頂端換算成字形頂端（已用核准原圖逐像素對位校正）
+   卡片角度：handoff 表上的角度是 PIL（逆時針為正），CSS rotate 順時針為正，所以正負號相反 */
+.line1 {
+  left: 5%;
+  top: calc(11.7% - 0.07em);
+  font-size: 22.6cqw;
+}
+.line2 {
+  left: 4.8%;
+  top: calc(25% - 0.06em);
+  font-size: 18.5cqw;
+}
+
+.sub,
+.sentence {
+  position: absolute;
+  z-index: 3;
+  margin: 0;
+  color: #fff;
+}
+.sub {
+  left: 5%;
+  top: calc(75% - 0.12em);
+  font-family: var(--font-ai-hero), var(--cjk);
+  font-weight: 800;
+  font-size: 5.19cqw;
+  line-height: 1.23;
+  letter-spacing: 0.01em;
+}
+.sentence {
+  left: 5.2%;
+  top: 83.3%;
+  font-family: var(--cjk);
+  font-weight: 400;
+  font-size: clamp(15px, 2.6cqw, 28px);
+  line-height: 1.5;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.84);
+}
+
+/* ── 卡片 ── */
+.cards {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.card {
+  position: absolute;
+  z-index: 3;
+  width: calc(var(--u) * 340);
+  height: calc(var(--u) * 240);
+  transform: translate(-50%, -50%) rotate(var(--rot));
+}
+.card[data-card="01"] { left: 16.2%; top: 41.7%; --rot: 6deg; --float-dur: 5.2s; --float-delay: 0s; }
+.card[data-card="02"] { left: 16.2%; top: 54.4%; --rot: -5deg; --float-dur: 5.8s; --float-delay: -1.6s; }
+.card[data-card="03"] { left: 15.7%; top: 67.2%; --rot: 4deg; --float-dur: 4.6s; --float-delay: -3.1s; }
+
+.cardInner {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  padding: calc(var(--u) * 28) calc(var(--u) * 30);
+  border-radius: calc(var(--u) * 34);
+  background: rgba(43, 76, 224, 0.5);
+  -webkit-backdrop-filter: blur(min(calc(var(--u) * 26), 12px));
+  backdrop-filter: blur(min(calc(var(--u) * 26), 12px));
+  animation: heroFloat var(--float-dur) ease-in-out var(--float-delay) infinite;
+  will-change: transform;
+}
+.cardTop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px;
+  white-space: nowrap;
+}
+.cardNo {
+  font-family: "Manrope Variable", sans-serif;
+  font-weight: 700;
+  font-size: max(calc(var(--u) * 22), 9px);
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.9);
+}
+.cardStatus {
+  font-family: var(--cjk);
+  font-weight: 500;
+  font-size: max(calc(var(--u) * 20), 9px);
+  color: var(--lime);
+}
+.cardRole {
+  margin: auto 0 0;
+  font-family: var(--font-ai-hero), var(--cjk);
+  font-weight: 800;
+  font-size: calc(var(--u) * 78);
+  line-height: 1;
+  letter-spacing: 0.01em;
+  color: #fff;
+}
+.cardDesc {
+  margin: calc(var(--u) * 12) 0 0;
+  font-family: var(--cjk);
+  font-weight: 500;
+  font-size: max(calc(var(--u) * 26), 10px);
+  line-height: 1.2;
+  color: rgba(255, 255, 255, 0.94);
+}
+
+/* ── 旋轉徽章（主要 CTA → #book） ── */
+.badge {
+  position: absolute;
+  z-index: 3;
+  left: 81.5%;
+  top: 90.6%;
+  width: 25.9cqw;
+  height: 25.9cqw;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  color: #10131a;
+}
+.badge:hover {
+  color: #10131a;
+}
+.badge:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 4px;
+}
+.badgeSpin,
+.badgeSpinHover {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+.badgeSpin {
+  animation: heroSpin 18s linear infinite;
+}
+/* 滑鼠移上去時加速：內層再疊一個旋轉，從暫停改成播放，不會跳格 */
+.badgeSpinHover {
+  animation: heroSpin 6s linear infinite paused;
+}
+.badge:hover .badgeSpinHover,
+.badge:focus-visible .badgeSpinHover {
+  animation-play-state: running;
+}
+.badgeSpin svg,
+.badgeArrow {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.badgeText {
+  font-family: var(--font-ai-hero), var(--cjk);
+}
+
+.mobileBreak {
+  display: inline;
+}
+
+@keyframes heroSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes heroFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+/* ── 桌機（≥ 768px）：2560×1200 構圖 ── */
+@media (min-width: 768px) {
+  .headerSafe {
+    padding-top: max(0px, calc(80px - 3.89cqw));
+  }
+  .canvas {
+    aspect-ratio: 32 / 15;
+    --u: calc(13.28cqw / 340);
+  }
+  .eyebrow {
+    display: block;
+    position: absolute;
+    z-index: 1;
+    left: 4.3%;
+    top: 13.5%;
+    margin: 0;
+    font-size: clamp(11px, 0.55cqw, 14px);
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.72);
+  }
+  .line1,
+  .line2 {
+    font-size: 14.06cqw;
+  }
+  .line1 {
+    left: 4.06%;
+    top: calc(22.9% - 0.08em);
+  }
+  .line2 {
+    left: 3.95%;
+    top: calc(52.1% - 0.08em);
+  }
+  .sub {
+    left: 4.3%;
+    top: calc(84.5% - 0.12em);
+    font-size: clamp(18px, 1.875cqw, 48px);
+    line-height: 1.2;
+  }
+  .sentence {
+    left: 4.38%;
+    top: 90.4%;
+    font-size: clamp(15px, 1.09cqw, 28px);
+    line-height: 1.3;
+  }
+  .card[data-card="01"] { left: 33.6%; top: 21.8%; --rot: 6deg; }
+  .card[data-card="02"] { left: 50.4%; top: 88.3%; --rot: -4deg; }
+  .card[data-card="03"] { left: 92.6%; top: 76.7%; --rot: 6deg; }
+  .cardInner {
+    -webkit-backdrop-filter: blur(calc(var(--u) * 26));
+    backdrop-filter: blur(calc(var(--u) * 26));
+  }
+  .badge {
+    left: 93.4%;
+    top: 20.8%;
+    width: 11.72cqw;
+    height: 11.72cqw;
+  }
+  .mobileBreak {
+    display: none;
+  }
+}
+
+/* 768–1023px：H1 有 15px 下限，字距收窄一點，避免句尾壓到前景層左下的萊姆筆觸 */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .sentence {
+    letter-spacing: 0.04em;
+  }
+}
+
+/* L1（單張藝術層）：巨字會壓在 Lulu 上，第二行右緣要留在 Lulu 左側（桌機最多到畫面寬 59%） */
+@media (min-width: 768px) {
+  .hero[data-layers="L1"] .line1,
+  .hero[data-layers="L1"] .line2 {
+    font-size: 11.8cqw;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .badgeSpin,
+  .badgeSpinHover,
+  .cardInner {
+    animation: none;
+  }
+}
