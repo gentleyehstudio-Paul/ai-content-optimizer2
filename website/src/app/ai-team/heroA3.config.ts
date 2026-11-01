@@ -17,7 +17,7 @@ export type HeroA3Options = {
 };
 
 export const HERO_A3: HeroA3Options = {
-  h1: "3A",
+  h1: "3B",
   layers: "L2",
   header: "H-B",
 };
