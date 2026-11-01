@@ -3,6 +3,7 @@ import Script from "next/script";
 import "./globals.css";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { YOUTUBE_CHANNEL_URL } from "@/lib/social";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://www.gentleyehdesign.com"),
@@ -85,6 +86,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               sameAs: [
                 "https://www.linkedin.com/in/paul-yeh-82a185154/",
                 "https://line.me/R/ti/p/%40kij2619w",
+                ...(YOUTUBE_CHANNEL_URL ? [YOUTUBE_CHANNEL_URL] : []),
               ],
             }),
           }}

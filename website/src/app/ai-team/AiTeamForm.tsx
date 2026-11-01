@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { ATTR_STORE, sendAiTeamEvent } from "./tracking";
 
 const PLAN_OPTIONS = [
   { value: "personal", label: "個人版" },
@@ -18,19 +19,46 @@ const ATTRIBUTION_KEYS = [
   "oai_adid",
   "oppref",
 ];
-const ATTR_STORE = "gy_ai_team_attr";
+const FIRST_STORE = "gy_ai_team_first"; // 第一次帶參數進站（保留 90 天）
+const FIRST_TTL = 90 * 24 * 60 * 60 * 1000;
 
+function paramsFromUrl(): string {
+  const params = new URLSearchParams(window.location.search);
+  return ATTRIBUTION_KEYS.filter((k) => params.get(k))
+    .map((k) => `${k}=${params.get(k)!.slice(0, 120)}`)
+    .join("&");
+}
+
+function readFirstTouch(fromUrl: string): string {
+  try {
+    const raw = localStorage.getItem(FIRST_STORE);
+    if (raw) {
+      const saved = JSON.parse(raw) as { v: string; t: number };
+      if (Date.now() - saved.t < FIRST_TTL) return saved.v;
+    }
+    if (fromUrl) {
+      const v = `${fromUrl}&lp=${window.location.pathname}&d=${new Date().toISOString().slice(0, 10)}`;
+      localStorage.setItem(FIRST_STORE, JSON.stringify({ v, t: Date.now() }));
+      return v;
+    }
+  } catch {
+    // localStorage 不可用時略過
+  }
+  return "";
+}
+
+// 寄給 Gentle 的信裡「廣告參數」：last=最後一次的廣告參數；first=第一次（含進站頁 lp 與日期 d）
 function readAttribution(): string {
   try {
-    const params = new URLSearchParams(window.location.search);
-    const fromUrl = ATTRIBUTION_KEYS.filter((k) => params.get(k))
-      .map((k) => `${k}=${params.get(k)!.slice(0, 120)}`)
-      .join("&");
-    if (fromUrl) {
-      sessionStorage.setItem(ATTR_STORE, fromUrl);
-      return fromUrl;
-    }
-    return sessionStorage.getItem(ATTR_STORE) ?? "";
+    const fromUrl = paramsFromUrl();
+    if (fromUrl) sessionStorage.setItem(ATTR_STORE, fromUrl);
+    const last = fromUrl || sessionStorage.getItem(ATTR_STORE) || "";
+    const first = readFirstTouch(fromUrl);
+    const parts: string[] = [];
+    if (last) parts.push(`last: ${last}`);
+    if (first && !first.startsWith(last + "&lp=")) parts.push(`first: ${first}`);
+    else if (first) parts.push(first.slice(last.length + 1)); // 同一次：只補 lp 與日期
+    return parts.join(" | ");
   } catch {
     return "";
   }
@@ -72,6 +100,10 @@ export function AiTeamForm() {
         }),
       });
       // 只有伺服器明確回 2xx 才算成功
+      if (res.ok) {
+        // GA4：只在伺服器回 2xx 後送出（之後在 GA4 後台標為關鍵事件）
+        sendAiTeamEvent("generate_lead", { form: "ai-team", plan: plan || "未選" });
+      }
       setStatus(res.ok ? "sent" : "error");
     } catch {
       setStatus("error");
