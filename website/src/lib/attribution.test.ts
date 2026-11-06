@@ -1,6 +1,7 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import {
   ATTRIBUTION_SESSION_KEY,
+  NO_EXTERNAL_REFERRER,
   emptyLeadAttribution,
   leadAttributionEmailRows,
   rememberAttribution,
@@ -66,13 +67,16 @@ describe("sanitize attribution values", () => {
     expect(sanitizeLandingPath("/a/../../b")).toBe("");
   });
 
-  it("keeps an external origin and path, never the query or same-site referrer", () => {
-    expect(sanitizeReferrer("https://news.example/a/b?q=secret#h", "https://www.gentleyehdesign.com")).toBe(
-      "https://news.example/a/b",
-    );
+  it("keeps only an external origin, never the path, query, or same-site referrer", () => {
+    expect(
+      sanitizeReferrer(
+        "https://news.example/account/jane.doe/orders/9981?email=secret@x.com#h",
+        "https://www.gentleyehdesign.com",
+      ),
+    ).toBe("https://news.example");
     expect(
       sanitizeReferrer("https://l.instagram.com/p/1?token=abc#h", "https://www.gentleyehdesign.com"),
-    ).toBe("https://l.instagram.com/p/1");
+    ).toBe("https://l.instagram.com");
     expect(
       sanitizeReferrer(
         "https://www.gentleyehdesign.com/ai-team?utm_source=ig&token=again#x",
@@ -85,7 +89,7 @@ describe("sanitize attribution values", () => {
 });
 
 describe("rememberAttribution", () => {
-  it("retains the first landing, referrer, and first non-empty utm across navigation", () => {
+  it("retains the first landing, referrer origin, and the first utm set across navigation", () => {
     const { data, storage } = memoryStorage();
     const first = rememberAttribution(
       env(storage, {
@@ -109,12 +113,13 @@ describe("rememberAttribution", () => {
       utm_campaign: "spring",
       utm_term: "logo",
       utm_content: "bio",
-      referrer: "https://l.instagram.com/p/1",
+      referrer: "https://l.instagram.com",
       landing: "/ai-team",
     });
     expect(second.utm_source).toBe("ig");
+    expect(second.utm_campaign).toBe("spring");
     expect(second.landing).toBe("/ai-team");
-    expect(second.referrer).toBe("https://l.instagram.com/p/1");
+    expect(second.referrer).toBe("https://l.instagram.com");
 
     const raw = data.get(ATTRIBUTION_SESSION_KEY) ?? "";
     const stored = JSON.parse(raw) as Record<string, string>;
@@ -124,6 +129,7 @@ describe("rememberAttribution", () => {
     expect(raw).not.toContain("secret@");
     expect(raw).not.toContain("gclid");
     expect(raw).not.toContain("token");
+    expect(raw).not.toContain("/p/1");
     expect(raw).not.toContain("#");
     expect(raw).not.toContain("?");
   });
@@ -137,15 +143,55 @@ describe("rememberAttribution", () => {
     });
   });
 
-  it("fills an empty utm later, but does not replace the first landing page", () => {
+  it("adopts the first complete utm set after an untagged landing, then refuses a later campaign", () => {
     const { storage } = memoryStorage();
-    rememberAttribution(env(storage, { pathname: "/" }));
-    const next = rememberAttribution(
-      env(storage, { search: "?utm_source=newsletter", pathname: "/contact" }),
+    rememberAttribution(
+      env(storage, {
+        pathname: "/",
+        referrer: "https://news.example/account/jane.doe?token=abc",
+      }),
     );
-    expect(next.utm_source).toBe("newsletter");
-    expect(next.landing).toBe("/");
-    expect(next.referrer).toBe("");
+    const tagged = rememberAttribution(
+      env(storage, {
+        search: "?utm_source=campaign-a&utm_campaign=spring",
+        pathname: "/printscale",
+        referrer: "https://other.example/path",
+      }),
+    );
+    const other = rememberAttribution(
+      env(storage, {
+        search: "?utm_source=campaign-b&utm_medium=cpc&utm_campaign=winter&utm_term=logo&utm_content=ad",
+        pathname: "/contact",
+      }),
+    );
+    expect(tagged).toMatchObject({
+      utm_source: "campaign-a",
+      utm_medium: "",
+      utm_campaign: "spring",
+      utm_term: "",
+      utm_content: "",
+      referrer: "https://news.example",
+      landing: "/",
+    });
+    expect(other).toEqual(tagged);
+    expect(JSON.stringify(other)).not.toContain("jane");
+    expect(JSON.stringify(other)).not.toContain("campaign-b");
+    expect(JSON.stringify(other)).not.toContain("winter");
+  });
+
+  it("does not fill empty fields of the first utm set from a second campaign", () => {
+    const { storage } = memoryStorage();
+    rememberAttribution(env(storage, { search: "?utm_source=campaign-a", pathname: "/ai-team" }));
+    const next = rememberAttribution(
+      env(storage, {
+        search: "?utm_source=campaign-b&utm_medium=cpc&utm_campaign=winter",
+        pathname: "/printscale",
+      }),
+    );
+    expect(next.utm_source).toBe("campaign-a");
+    expect(next.utm_medium).toBe("");
+    expect(next.utm_campaign).toBe("");
+    expect(next.landing).toBe("/ai-team");
   });
 
   it("keeps working from memory when storage throws, and loses it after a new document", () => {
@@ -166,7 +212,7 @@ describe("rememberAttribution", () => {
     );
     const second = rememberAttribution(env(throwing, { pathname: "/printscale" }));
     expect(first.utm_source).toBe("ig");
-    expect(first.referrer).toBe("https://news.example/a");
+    expect(first.referrer).toBe("https://news.example");
     expect(second.utm_source).toBe("ig");
     expect(second.landing).toBe("/");
 
@@ -196,7 +242,7 @@ describe("leadAttributionEmailRows", () => {
         gclid: "abc",
       }),
     ).toEqual([
-      ["初次造訪來源", "直接造訪"],
+      ["初次造訪來源", NO_EXTERNAL_REFERRER],
       ["初次落地頁", "/printscale"],
     ]);
   });
@@ -212,9 +258,10 @@ describe("leadAttributionEmailRows", () => {
     const text = JSON.stringify(rows);
     expect(rows).toContainEqual(["utm_medium", "cpc"]);
     expect(rows).toContainEqual(["utm_campaign", "春季活動"]);
-    expect(rows).toContainEqual(["初次造訪來源", "https://evil.example/land"]);
+    expect(rows).toContainEqual(["初次造訪來源", "https://evil.example"]);
     expect(rows).toContainEqual(["初次落地頁", "/printscale"]);
     expect(text).not.toContain("onerror");
+    expect(text).not.toContain("/land");
     expect(text).not.toContain("super-secret");
     expect(text).not.toContain("hidden@");
     expect(text).not.toContain("#");

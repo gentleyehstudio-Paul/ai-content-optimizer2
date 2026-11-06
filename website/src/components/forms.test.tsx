@@ -201,6 +201,35 @@ describe("LeadForm", () => {
     expect(leadCalls(gtag)).toHaveLength(1);
     expect(leadCalls(gtag)[0][2]).toEqual({ form: "home", service: "consult" });
   });
+
+  it("records a second successful lead after the form is mounted again", async () => {
+    const gtag = installGtag();
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    window.history.pushState({}, "", "/printscale");
+    const fields = (
+      <LeadForm source="/printscale" service="printscale" successMessage="已收到">
+        {() => (
+          <>
+            <input name="email" defaultValue="lead@example.com" />
+            <button type="submit">送出</button>
+          </>
+        )}
+      </LeadForm>
+    );
+    const first = render(fields);
+    fireEvent.submit(document.querySelector("form")!);
+    expect(await screen.findByRole("status")).toBeTruthy();
+    expect(leadCalls(gtag)).toHaveLength(1);
+    first.unmount();
+
+    render(fields);
+    fireEvent.submit(document.querySelector("form")!);
+    expect(await screen.findByRole("status")).toBeTruthy();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(leadCalls(gtag)).toHaveLength(2);
+    expect(JSON.stringify(leadCalls(gtag))).not.toContain("lead@example.com");
+  });
 });
 
 describe("ContactForm", () => {

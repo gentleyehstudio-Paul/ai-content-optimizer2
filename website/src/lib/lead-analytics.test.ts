@@ -17,6 +17,7 @@ beforeEach(() => {
   sessionStorage.clear();
   window.history.pushState({}, "", "/ai-team");
   delete (window as unknown as { gtag?: Gtag }).gtag;
+  delete (window as unknown as { dataLayer?: unknown }).dataLayer;
 });
 
 describe("trackGenerateLead", () => {
@@ -47,11 +48,24 @@ describe("trackGenerateLead", () => {
     expect(JSON.stringify(gtag.mock.calls)).not.toContain("王小明");
   });
 
-  it("does not emit when gtag is missing, and does not emit later for the same attempt", () => {
-    expect(trackGenerateLead({ form: "printscale", email: "a@b.com" }, "missing")).toBe(false);
-    installGtag();
+  it("queues once on the existing dataLayer when gtag is not loaded, without retrying", () => {
+    const existing: unknown[] = [["js", new Date()]];
+    (window as unknown as { dataLayer: unknown[] }).dataLayer = existing;
+    expect(trackGenerateLead({ form: "printscale", email: "a@b.com" }, "missing")).toBe(true);
+    expect(existing).toHaveLength(2);
+    const queued = existing[1] as { 0: string; 1: string; 2: Record<string, string> };
+    expect(queued[0]).toBe("event");
+    expect(queued[1]).toBe("generate_lead");
+    expect(queued[2]).toEqual({ form: "printscale" });
+    expect(JSON.stringify(queued[2])).not.toContain("a@b.com");
+    expect((window as unknown as { gtag?: Gtag }).gtag).toBeUndefined();
+
     expect(trackGenerateLead({ form: "printscale" }, "missing")).toBe(false);
-    expect((window as unknown as { gtag: Gtag }).gtag).not.toHaveBeenCalled();
+    expect(existing).toHaveLength(2);
+
+    const gtag = installGtag();
+    expect(trackGenerateLead({ form: "printscale" }, "missing")).toBe(false);
+    expect(gtag).not.toHaveBeenCalled();
   });
 
   it("drops an email-shaped utm and still sends the rest", () => {
@@ -93,6 +107,24 @@ describe("createLeadAttempt", () => {
     expect(attempt.start()).toBe(true);
     expect(attempt.shouldTrack(true)).toBe(false);
     expect(attempt.shouldTrack(false)).toBe(false);
+  });
+
+  it("lets a later mount record another success without reusing the first key", () => {
+    const gtag = installGtag();
+    const first = createLeadAttempt("mount-a");
+    expect(first.start()).toBe(true);
+    expect(first.shouldTrack(false)).toBe(true);
+    expect(trackGenerateLead({ form: "printscale" }, first.dedupKey)).toBe(true);
+    expect(trackGenerateLead({ form: "printscale" }, first.dedupKey)).toBe(false);
+    expect(first.start()).toBe(false);
+
+    const second = createLeadAttempt("mount-b");
+    expect(second.dedupKey).not.toBe(first.dedupKey);
+    expect(second.start()).toBe(true);
+    expect(second.shouldTrack(false)).toBe(true);
+    expect(trackGenerateLead({ form: "contact" }, second.dedupKey)).toBe(true);
+    expect(gtag).toHaveBeenCalledTimes(2);
+    expect(gtag.mock.calls[1][2]).toMatchObject({ form: "contact" });
   });
 });
 

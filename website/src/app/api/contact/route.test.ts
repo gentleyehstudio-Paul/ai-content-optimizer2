@@ -89,7 +89,8 @@ describe("POST /api/contact attribution", () => {
     expect(mail.text).toContain(`utm_campaign：${"春".repeat(100)}`);
     expect(mail.text).not.toContain("春".repeat(101));
     expect(mail.text).toContain("utm_term：logo");
-    expect(mail.text).toContain("初次造訪來源：https://evil.example/land");
+    expect(mail.text).toContain("初次造訪來源：https://evil.example");
+    expect(mail.text).not.toContain("/land");
     expect(mail.text).toContain("初次落地頁：/printscale");
     expect(mail.text).toContain("公司：A&B <co>");
     expect(mail.text).toContain("電話：0912000000");
@@ -133,7 +134,7 @@ describe("POST /api/contact attribution", () => {
     expect(mail.text).toContain("廣告參數：last: utm_source=ig&oai_cid=abc&oppref=zz");
     expect(mail.text).toContain("utm_source：ig");
     expect(mail.text).toContain("utm_term：logo");
-    expect(mail.text).toContain("初次造訪來源：直接造訪");
+    expect(mail.text).toContain("初次造訪來源：無可用外部來源（可能直接造訪或來源未傳遞）");
     expect(mail.text).toContain("初次落地頁：/ai-team");
     expect(mail.html).toContain("&lt;script&gt;");
     expect(mail.html).not.toContain("<script>");

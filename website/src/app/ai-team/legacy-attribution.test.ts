@@ -2,6 +2,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { resetAttributionMemoryForTests } from "@/lib/attribution";
+import { readLeadAttribution } from "@/lib/attribution-client";
 import { readAiTeamAttribution } from "./legacy-attribution";
 
 beforeEach(() => {
@@ -49,6 +50,26 @@ describe("readAiTeamAttribution", () => {
     // 第一次帶參數的頁面是 /，90 天 first touch 的 lp 維持那一頁，不改成後來的表單頁。
     expect(value).toContain("lp=/&d=");
     expect(value).not.toContain("lp=/ai-team");
+  });
+
+  it("uses the frozen session set without writing the 90-day record", () => {
+    window.history.pushState({}, "", "/?utm_source=ig&utm_campaign=spring");
+    readLeadAttribution();
+    window.history.pushState({}, "", "/ai-team");
+    const value = readAiTeamAttribution();
+    expect(value).toContain("utm_source=ig");
+    expect(value).toContain("utm_campaign=spring");
+    expect(localStorage.getItem("gy_ai_team_first")).toBeNull();
+  });
+
+  it("does not mix a later partial url into the first campaign", () => {
+    window.history.pushState({}, "", "/?utm_source=campaign-a&utm_campaign=spring");
+    readLeadAttribution();
+    window.history.pushState({}, "", "/ai-team?utm_source=campaign-b");
+    const value = readAiTeamAttribution();
+    expect(value).toContain("last: utm_source=campaign-b");
+    expect(value).not.toContain("spring");
+    expect(value).not.toContain("campaign-a");
   });
 
   it("returns an empty string when storage throws", () => {

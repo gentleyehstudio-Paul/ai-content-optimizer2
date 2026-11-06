@@ -12,13 +12,16 @@
  * 語意：
  * - 初次落地頁：這個分頁第一次記下歸因時的 pathname，之後換頁不覆寫。
  *   只留路徑，去掉 `?query` 與 `#hash`。
- * - 初次造訪來源：第一次記下時的 document.referrer。只留 origin + pathname，
- *   去掉帳密、query、hash。同站（gentleyehdesign.com、www、目前頁面的 host、
- *   localhost）視為站內導覽，記成空字串；信件因此顯示「直接造訪」。
- *   不從 referrer 的 query 回推 UTM，避免把權杖或其他敏感參數存下來。
- * - UTM：只讀 utm_source、utm_medium、utm_campaign、utm_term、utm_content。
- *   每個欄位採「第一個非空值」：換頁不會遺失，同一次瀏覽稍後出現的不同值也不覆蓋。
- *   其他 query（gclid、fbclid、email、token 等）不讀、不存。
+ * - 初次造訪來源：第一次記下時的 document.referrer。只留 origin（協定 + 主機），
+ *   不留 pathname、query、hash、帳密。路徑也可能含帳號、信箱或權杖，所以不存。
+ *   同站（gentleyehdesign.com、www、目前頁面的 host、localhost）視為站內導覽，記成空字串。
+ *   空字串只代表「沒有可用的外部來源」，不是已證實的直接造訪；瀏覽器常會拿掉 referrer。
+ *   不從 referrer 回推 UTM，避免把權杖或其他敏感參數存下來。
+ * - UTM：只讀 utm_source、utm_medium、utm_campaign、utm_term、utm_content，而且整組一起記。
+ *   第一次出現「至少一個合法 UTM」的網址，五個欄位（含當時是空的）就凍結。
+ *   之後換一組活動不會改寫，也不會用活動 B 的 campaign 去補活動 A 留下的空欄。
+ *   若進站時完全沒有 UTM，落地頁與 referrer 仍先記下；稍後同一分頁第一次出現的那一整組
+ *   UTM 才成為這組 snapshot。其他 query（gclid、fbclid、email、token 等）不讀、不存。
  * - 長度與字元：UTM 最長 100，referrer 最長 300，落地頁最長 200。
  *   去掉控制字元。UTM 若含換行、`<` `>`、引號、`@`、`?`、`#`、`://` 就整段丟棄。
  *   允許文字、數字、空格與 `.` `_` `-` `+` `/` `|` `~`，所以中文活動名稱可以留下。
@@ -31,6 +34,9 @@
  */
 
 export const ATTRIBUTION_SESSION_KEY = "gy_lead_attr_v1";
+
+/** 信件用。空的 referrer 不是已證實的直接造訪。 */
+export const NO_EXTERNAL_REFERRER = "無可用外部來源（可能直接造訪或來源未傳遞）";
 
 export const UTM_KEYS = [
   "utm_source",
@@ -138,7 +144,7 @@ function isFirstPartyHost(hostname: string, pageOrigin?: string): boolean {
   }
 }
 
-/** 只留外部網站的 origin + pathname。同站、帶帳密、或不是 http(s) 都回空字串。 */
+/** 只留外部網站的 origin。同站、帶帳密、或不是 http(s) 都回空字串。 */
 export function sanitizeReferrer(raw: unknown, pageOrigin?: string): string {
   if (typeof raw !== "string") return "";
   const trimmed = raw.trim();
@@ -152,12 +158,9 @@ export function sanitizeReferrer(raw: unknown, pageOrigin?: string): string {
   if (url.username || url.password) return "";
   if (url.protocol !== "http:" && url.protocol !== "https:") return "";
   if (isFirstPartyHost(url.hostname, pageOrigin)) return "";
-  const safePath = sanitizeLandingPath(url.pathname);
-  if (!safePath) return "";
-  const suffix = safePath === "/" ? "" : safePath;
-  const rebuilt = `${url.protocol}//${url.host}${suffix}`;
-  if (rebuilt.length > REFERRER_MAX) return "";
-  if (rebuilt.includes("?") || rebuilt.includes("#")) return "";
+  const rebuilt = url.origin;
+  if (!rebuilt || rebuilt.length > REFERRER_MAX) return "";
+  if (rebuilt.includes("?") || rebuilt.includes("#") || rebuilt.includes("@")) return "";
   return rebuilt;
 }
 
@@ -187,7 +190,7 @@ export function leadAttributionEmailRows(raw: unknown): [string, string][] | nul
   for (const key of UTM_KEYS) {
     if (attr[key]) rows.push([key, attr[key]]);
   }
-  rows.push(["初次造訪來源", attr.referrer || "直接造訪"]);
+  rows.push(["初次造訪來源", attr.referrer || NO_EXTERNAL_REFERRER]);
   rows.push(["初次落地頁", attr.landing || "—"]);
   return rows;
 }
@@ -208,17 +211,22 @@ function readStored(storage: StorageLike): LeadAttribution | null {
   return parseLeadAttribution(JSON.parse(raw) as unknown);
 }
 
+function hasUtmSnapshot(attr: LeadAttribution): boolean {
+  return UTM_KEYS.some((key) => attr[key] !== "");
+}
+
 function mergeFirstTouch(prev: LeadAttribution, fresh: LeadAttribution): LeadAttribution {
   const next = { ...prev };
-  for (const key of UTM_KEYS) {
-    if (!next[key] && fresh[key]) next[key] = fresh[key];
+  // 尚無任何 UTM 時，下一次出現的整組才寫入。已有 snapshot 就連空欄一起保留。
+  if (!hasUtmSnapshot(prev) && hasUtmSnapshot(fresh)) {
+    for (const key of UTM_KEYS) next[key] = fresh[key];
   }
   if (!next.landing && fresh.landing) next.landing = fresh.landing;
   return next;
 }
 
 /**
- * 讀取並補上目前這一頁的歸因。已記下的落地頁、referrer、非空 UTM 不會被覆蓋。
+ * 讀取並補上目前這一頁的歸因。已記下的落地頁、referrer，以及第一組 UTM，都不會被覆蓋。
  * storage 丟例外時改用記憶體，自己也不丟例外。
  */
 export function rememberAttribution(env: AttributionEnv): LeadAttribution {

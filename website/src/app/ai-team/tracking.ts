@@ -1,7 +1,8 @@
 // /ai-team 的 GA4 事件（依 13-shortvideo-channel-plan.md 追蹤段落）。
 // GA4 由 layout.tsx 以 next/script（afterInteractive）載入 gtag.js（G-TXGL9R0B66），不是 GTM 容器。
-// gtag 不存在時一律略過。事件參數不含姓名、Email、電話或其他個資。
-// generate_lead 走 trackGenerateLead：同一次嘗試只送一次，失敗的表單不會送。
+// generate_lead 在 gtag 尚未出現時只推進既有 dataLayer 一次，不保證 GA4 收到。
+// line_click 仍沿用原本的行為：gtag 不存在就略過。事件參數不含姓名、Email、電話或其他個資。
+// generate_lead 走 trackGenerateLead：同一筆成功只送一次，失敗的表單不會送。
 // line_click 維持原本可以重複送出，不跟詢價去重。
 // 站外的 GA4 加強型評估或 GTM 後台是否另外聽表單，程式庫裡看不到。
 
