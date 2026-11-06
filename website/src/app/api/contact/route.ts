@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { leadAttributionEmailRows } from "@/lib/attribution";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -46,7 +47,7 @@ const esc = (s: string) =>
 // 轉成單行（避免標頭注入）並限制長度
 const oneLine = (v: unknown, max: number) =>
   String(v ?? "")
-    .replace(/[\r\n\t]+/g, " ")
+    .replace(/[\r\n\t\u2028\u2029]+/g, " ")
     .trim()
     .slice(0, max);
 
@@ -96,11 +97,16 @@ export async function POST(req: Request) {
   // 以下為 /ai-team 頁使用的選填欄位，其他頁不送就不會出現在信裡
   const plan = PLANS[String(body.plan ?? "")] ?? "";
   const timeslot = oneLine(body.timeslot, 200);
+  // /ai-team 既有的廣告參數字串（含 oai_* / oppref）。只收單行並在 HTML 轉義。
   const attribution = oneLine(body.attribution, 600);
   const extra: [string, string][] = [];
   if (plan) extra.push(["版本", plan]);
   if (timeslot) extra.push(["方便的時段", timeslot]);
   if (attribution) extra.push(["廣告參數", attribution]);
+  // 共用表單的結構化歸因。不信任客戶端：白名單、長度與跳脫都在這裡再做一次。
+  for (const [label, value] of leadAttributionEmailRows(body.leadAttribution) ?? []) {
+    extra.push([oneLine(label, 40), oneLine(value, 300)]);
+  }
   const service = SERVICES[String(body.service ?? "")] ?? "未選擇";
 
   if (!name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {

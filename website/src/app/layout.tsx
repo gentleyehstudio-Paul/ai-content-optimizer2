@@ -3,6 +3,7 @@ import Script from "next/script";
 import "./globals.css";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { AttributionCapture } from "@/components/AttributionCapture";
 import { YOUTUBE_CHANNEL_URL } from "@/lib/social";
 
 export const metadata: Metadata = {
@@ -39,6 +40,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         </Script>
       </head>
       <body className="min-h-dvh flex flex-col font-sans">
+        <AttributionCapture />
         <Header />
         <main className="flex-1">{children}</main>
         <Footer />

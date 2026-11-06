@@ -1,68 +1,15 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
-import { ATTR_STORE, sendAiTeamEvent } from "./tracking";
+import { useRef, useState, type FormEvent } from "react";
+import { readLeadAttribution } from "@/lib/attribution-client";
+import { createLeadAttempt } from "@/lib/lead-analytics";
+import { readAiTeamAttribution } from "./legacy-attribution";
+import { sendAiTeamEvent } from "./tracking";
 
 const PLAN_OPTIONS = [
   { value: "personal", label: "個人版" },
   { value: "business", label: "企業版" },
 ];
-
-// 廣告參數：只讀網址上的這些鍵，連同表單一起寄出（不送進任何追蹤事件）
-const ATTRIBUTION_KEYS = [
-  "utm_source",
-  "utm_medium",
-  "utm_campaign",
-  "utm_content",
-  "oai_cid",
-  "oai_agid",
-  "oai_adid",
-  "oppref",
-];
-const FIRST_STORE = "gy_ai_team_first"; // 第一次帶參數進站（保留 90 天）
-const FIRST_TTL = 90 * 24 * 60 * 60 * 1000;
-
-function paramsFromUrl(): string {
-  const params = new URLSearchParams(window.location.search);
-  return ATTRIBUTION_KEYS.filter((k) => params.get(k))
-    .map((k) => `${k}=${params.get(k)!.slice(0, 120)}`)
-    .join("&");
-}
-
-function readFirstTouch(fromUrl: string): string {
-  try {
-    const raw = localStorage.getItem(FIRST_STORE);
-    if (raw) {
-      const saved = JSON.parse(raw) as { v: string; t: number };
-      if (Date.now() - saved.t < FIRST_TTL) return saved.v;
-    }
-    if (fromUrl) {
-      const v = `${fromUrl}&lp=${window.location.pathname}&d=${new Date().toISOString().slice(0, 10)}`;
-      localStorage.setItem(FIRST_STORE, JSON.stringify({ v, t: Date.now() }));
-      return v;
-    }
-  } catch {
-    // localStorage 不可用時略過
-  }
-  return "";
-}
-
-// 寄給 Gentle 的信裡「廣告參數」：last=最後一次的廣告參數；first=第一次（含進站頁 lp 與日期 d）
-function readAttribution(): string {
-  try {
-    const fromUrl = paramsFromUrl();
-    if (fromUrl) sessionStorage.setItem(ATTR_STORE, fromUrl);
-    const last = fromUrl || sessionStorage.getItem(ATTR_STORE) || "";
-    const first = readFirstTouch(fromUrl);
-    const parts: string[] = [];
-    if (last) parts.push(`last: ${last}`);
-    if (first && !first.startsWith(last + "&lp=")) parts.push(`first: ${first}`);
-    else if (first) parts.push(first.slice(last.length + 1)); // 同一次：只補 lp 與日期
-    return parts.join(" | ");
-  } catch {
-    return "";
-  }
-}
 
 const inputStyle = {
   background: "#252e26",
@@ -77,12 +24,18 @@ type Status = "idle" | "sending" | "sent" | "error";
 export function AiTeamForm() {
   const [plan, setPlan] = useState("");
   const [status, setStatus] = useState<Status>("idle");
+  const attemptRef = useRef<ReturnType<typeof createLeadAttempt> | null>(null);
+  if (attemptRef.current === null) attemptRef.current = createLeadAttempt();
+  const attempt = attemptRef.current;
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (status === "sending") return;
+    if (!attempt.start()) return;
     setStatus("sending");
     const fd = new FormData(e.currentTarget);
+    const honeypot = fd.get("website");
+    const isBot = typeof honeypot === "string" && honeypot.trim() !== "";
+    const leadAttribution = readLeadAttribution();
     try {
       const res = await fetch("/api/contact", {
         method: "POST",
@@ -95,17 +48,31 @@ export function AiTeamForm() {
           email: fd.get("email"),
           timeslot: fd.get("timeslot"),
           message: fd.get("message"),
-          attribution: readAttribution(),
-          website: fd.get("website"), // honeypot
+          attribution: readAiTeamAttribution(),
+          leadAttribution,
+          website: honeypot, // honeypot
         }),
       });
-      // 只有伺服器明確回 2xx 才算成功
-      if (res.ok) {
-        // GA4：只在伺服器回 2xx 後送出（之後在 GA4 後台標為關鍵事件）
-        sendAiTeamEvent("generate_lead", { form: "ai-team", plan: plan || "未選" });
+      // 只有伺服器明確回 2xx 才算成功。沿用原本的 generate_lead，不另加第二個事件。
+      if (!res.ok) {
+        attempt.release();
+        setStatus("error");
+        return;
       }
-      setStatus(res.ok ? "sent" : "error");
+      if (attempt.shouldTrack(isBot)) {
+        try {
+          sendAiTeamEvent(
+            "generate_lead",
+            { form: "ai-team", plan: plan || "未選" },
+            attempt.dedupKey,
+          );
+        } catch {
+          // 追蹤失敗不影響已成功的預約
+        }
+      }
+      setStatus("sent");
     } catch {
+      attempt.release();
       setStatus("error");
     }
   }
