@@ -1,6 +1,9 @@
 "use client";
 
-import { useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
+import { useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
+import { utmParamsFromAttribution } from "@/lib/attribution";
+import { readLeadAttribution } from "@/lib/attribution-client";
+import { createLeadAttempt, trackGenerateLead } from "@/lib/lead-analytics";
 
 export const LINE_URL = "https://line.me/R/ti/p/%40kij2619w";
 
@@ -48,18 +51,25 @@ export function LeadForm({
   children,
 }: Props) {
   const [status, setStatus] = useState<Status>("idle");
+  const attemptRef = useRef<ReturnType<typeof createLeadAttempt> | null>(null);
+  if (attemptRef.current === null) attemptRef.current = createLeadAttempt();
+  const attempt = attemptRef.current;
   const sending = status === "sending";
   const dark = theme === "dark";
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (sending) return;
+    if (!attempt.start()) return;
     const fd = new FormData(e.currentTarget);
     setStatus("sending");
+    const honeypot = fd.get("website");
+    const isBot = typeof honeypot === "string" && honeypot.trim() !== "";
+    const leadAttribution = readLeadAttribution();
     const payload: Record<string, unknown> = {
       source,
       service,
-      website: fd.get("website"), // honeypot
+      leadAttribution,
+      website: honeypot, // honeypot
     };
     for (const k of FIELDS) {
       const v = fd.get(k);
@@ -71,9 +81,29 @@ export function LeadForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      // 只有伺服器明確回 2xx 才算成功
-      setStatus(res.ok ? "sent" : "error");
+      // 只有伺服器明確回 2xx 才算成功；失敗不送 GA4
+      if (!res.ok) {
+        attempt.release();
+        setStatus("error");
+        return;
+      }
+      if (attempt.shouldTrack(isBot)) {
+        try {
+          trackGenerateLead(
+            {
+              form: source === "/" ? "home" : source.slice(1),
+              service,
+              ...utmParamsFromAttribution(leadAttribution),
+            },
+            attempt.dedupKey,
+          );
+        } catch {
+          // 追蹤失敗不影響已成功的詢價
+        }
+      }
+      setStatus("sent");
     } catch {
+      attempt.release();
       setStatus("error");
     }
   }
